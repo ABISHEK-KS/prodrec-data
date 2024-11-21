@@ -21,7 +21,7 @@ def load_css():
 # Helper Functions
 @st.cache_data
 def load_data(file_path):
-    """Load dataset from a local Excel file and return a copy to avoid mutation."""
+    """Load dataset from a local CSV file and return a copy to avoid mutation."""
     data = pd.read_csv(file_path)
     
     # Check if 'category' column exists
@@ -65,87 +65,190 @@ def show_home():
     st.markdown("---")
     st.markdown("© 2024 ProdRec Inc. | Built with ❤️ using Streamlit")
 
+import pandas as pd
+import streamlit as st
+import plotly.express as px
+import plotly.graph_objects as go
+
+@st.cache_data
+def load_data(file_path):
+    """Load dataset from a local CSV file and return a copy to avoid mutation."""
+    data = pd.read_csv(file_path)
+    
+    # Check if 'Category' column exists (case-sensitive check)
+    if 'Category' not in data.columns:
+        raise ValueError("'Category' column not found in the dataset.")
+    
+    # Parse categories (handle cases where data might have multiple categories or issues)
+    data = parse_categories(data)
+    
+    # Clean other columns such as price, ratings
+    data['discounted_price'] = pd.to_numeric(data['Price now'], errors='coerce')
+    data['actual_price'] = pd.to_numeric(data['Earlier Price'], errors='coerce')
+    data['rating'] = pd.to_numeric(data['Rating'], errors='coerce')
+    data['rating_count'] = pd.to_numeric(data['Rating Count'], errors='coerce')
+
+    return data
+
+def parse_categories(data):
+    """Parse categories with synonyms separated by '|'."""
+    data['parsed_category'] = data['Category'].apply(lambda x: x.split('|')[0] if isinstance(x, str) else 'Unknown')
+    return data
+
+def show_home():
+    """Render the Home Page."""
+    st.title("Welcome to **ProdRec**")
+    st.subheader("Your Trusted Companion in Smarter Shopping Decisions")
+    st.markdown("""At **ProdRec**, we simplify your shopping journey by helping you:
+    - Discover products tailored to your needs and budget.
+    - Compare features, prices, and ratings side-by-side.
+    - Decide with confidence, backed by clear, transparent insights.
+
+    Let’s make your shopping experience smarter, easier, and more rewarding.""")
+    st.image(
+        "https://via.placeholder.com/1200x500.png?text=Your+Product+Comparison+Starts+Here!",
+        use_column_width=True,
+        caption="Explore. Compare. Decide."
+    )
+    st.markdown("---")
+    st.markdown("### Ready to explore?")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Explore Products"):
+            st.success("Switch to 'Compare Products' using the sidebar.")
+    with col2:
+        if st.button("Learn More"):
+            st.info("ProdRec makes smarter shopping possible.")
+    st.markdown("---")
+    st.markdown("© 2024 ProdRec Inc. | Built with ❤️ using Streamlit")
+
+@st.cache_data
+def load_data(file_path):
+    """Load dataset from a local CSV file and return a copy to avoid mutation."""
+    data = pd.read_csv(file_path)
+    
+    # Check if 'Category' column exists (case-sensitive check)
+    if 'Category' not in data.columns:
+        raise ValueError("'Category' column not found in the dataset.")
+    
+    # Parse categories (handle cases where data might have multiple categories or issues)
+    data = parse_categories(data)
+    
+    # Clean other columns such as price, ratings
+    data['discounted_price'] = pd.to_numeric(data['Price now'], errors='coerce')
+    data['actual_price'] = pd.to_numeric(data['Earlier Price'], errors='coerce')
+    data['rating'] = pd.to_numeric(data['Rating'], errors='coerce')
+    data['rating_count'] = pd.to_numeric(data['Rating Count'], errors='coerce')
+
+    return data
+
+def parse_categories(data):
+    """Parse categories if they contain multiple values separated by '|'. For now, we take the first category."""
+    data['parsed_category'] = data['Category'].apply(lambda x: x.split('|')[0] if isinstance(x, str) else 'Unknown')
+    return data
+
+@st.cache_data
+def load_data(file_path):
+    """Load dataset from a local CSV file and return a copy to avoid mutation."""
+    data = pd.read_csv(file_path)
+    
+    # Check if 'Category' column exists (case-sensitive check)
+    if 'Category' not in data.columns:
+        raise ValueError("'Category' column not found in the dataset.")
+    
+    # Parse categories (handle cases where data might have multiple categories or issues)
+    data = parse_categories(data)
+    
+    # Clean other columns such as price, ratings
+    data['discounted_price'] = pd.to_numeric(data['Price now'], errors='coerce')
+    data['actual_price'] = pd.to_numeric(data['Earlier Price'], errors='coerce')
+    data['rating'] = pd.to_numeric(data['Rating'], errors='coerce')
+    data['rating_count'] = pd.to_numeric(data['Rating Count'], errors='coerce')
+
+    return data
+
+def parse_categories(data):
+    """Parse categories if they contain multiple values separated by '|'. For now, we take the first category."""
+    data['parsed_category'] = data['Category'].apply(lambda x: x.split('|')[0] if isinstance(x, str) else 'Unknown')
+    return data
+
+@st.cache_data
+def load_data(file_path):
+    """Load dataset from a local CSV file and return a copy to avoid mutation."""
+    data = pd.read_csv(file_path)
+    
+    # Check if 'Category' column exists (case-sensitive check)
+    if 'Category' not in data.columns:
+        raise ValueError("'Category' column not found in the dataset.")
+    
+    # Parse categories (handle cases where data might have multiple categories or issues)
+    data = parse_categories(data)
+    
+    # Clean other columns such as price, ratings
+    data['discounted_price'] = pd.to_numeric(data['Price now'], errors='coerce')
+    data['actual_price'] = pd.to_numeric(data['Earlier Price'], errors='coerce')
+    data['rating'] = pd.to_numeric(data['Rating'], errors='coerce')
+    data['rating_count'] = pd.to_numeric(data['Rating Count'], errors='coerce')
+
+    return data
+
+def parse_categories(data):
+    """Parse categories if they contain multiple values separated by '|'. For now, we take the first category."""
+    data['parsed_category'] = data['Category'].apply(lambda x: x.split('|')[0] if isinstance(x, str) else 'Unknown')
+    return data
+
 def show_compare():
-    """Render the Product Comparison Page."""
-    st.title("🔍 Compare Products")
+    """Render the Product Comparison Page with Detailed Descriptions and Point System."""
+    st.title("🔍 Advanced Product Comparison")
     st.markdown("Compare products based on **category**, **price**, **ratings**, and other features.")
 
     # Load Dataset for General Comparison
-    DATA_FILE = "pr.csv"
-    try:
-        data = load_data(DATA_FILE)  # Now returns a copy, so it won't mutate cached data
-    except Exception as e:
-        st.error(f"Could not load the dataset. Make sure '{DATA_FILE}' exists in the same directory.\nError: {e}")
-        return
+    DATA_FILE = "opd.csv"  # Use your actual file path
+    data = load_data(DATA_FILE)
 
     # Category Selection for General Product Comparison
     unique_categories = data['parsed_category'].dropna().unique()
     selected_category = st.selectbox("Select a Category", unique_categories)
 
-    # Filter Data
+    # Filter Data based on Selected Category
     filtered_data = data[data['parsed_category'] == selected_category]
 
     # Product Selection
     st.subheader("Select Products to Compare")
-    product_options = filtered_data['product_name'].unique()
+    product_options = filtered_data['Name'].unique()  # Use 'Name' for product names
     selected_products = st.multiselect("Choose Products:", product_options, default=product_options[:2])
 
     if len(selected_products) >= 2:
-        comparison_data = filtered_data[filtered_data['product_name'].isin(selected_products)]
+        comparison_data = filtered_data[filtered_data['Name'].isin(selected_products)]
 
-        # Ensure numeric columns are treated as numeric
-        comparison_data['discounted_price'] = pd.to_numeric(comparison_data['discounted_price'], errors='coerce')
-        comparison_data['actual_price'] = pd.to_numeric(comparison_data['actual_price'], errors='coerce')
-        comparison_data['rating'] = pd.to_numeric(comparison_data['rating'], errors='coerce')
-        comparison_data['rating_count'] = pd.to_numeric(comparison_data['rating_count'], errors='coerce')
+        # Detailed Description and Image for each product
+        for product in selected_products:
+            st.subheader(f"Product Description: {product}")
+            product_data = comparison_data[comparison_data['Name'] == product].iloc[0]
+            
+            # Display product image from 'Media' column (not 'Image')
+            image_url = product_data['Media']
+            st.image(image_url, caption=f"{product} Image", use_column_width=True)
 
-        # Display Comparison Table with Styling
-        st.subheader("Comparison Table")
-        table_data = comparison_data[['product_name', 'discounted_price', 'actual_price',
-                                      'discount_percentage', 'rating', 'rating_count', 'about_product']]
+            # Product Description
+            st.markdown(f"**Category**: {product_data['parsed_category']}")
+            st.markdown(f"**Discounted Price**: ₹{product_data['discounted_price']:.2f}")
+            st.markdown(f"**Actual Price**: ₹{product_data['actual_price']:.2f}")
+            st.markdown(f"**Rating**: {product_data['rating']}/5")
+            st.markdown(f"**Rating Count**: {product_data['rating_count']}")
 
-        table_data = table_data.rename(columns={
-            'product_name': 'Product Name',
-            'discounted_price': 'Discounted Price',
-            'actual_price': 'Actual Price',
-            'discount_percentage': 'Discount (%)',
-            'rating': 'Rating',
-            'rating_count': 'Rating Count',
-            'about_product': 'Description'
-        })
+            # Show top reviews (you can customize this section as needed)
+            st.markdown(f"### Reviews for {product}")
+            st.markdown("#### Top Reviews:")
+            reviews = product_data['Reviews'].split(",")  # Assuming reviews are comma-separated
+            st.markdown(f"1. **{reviews[0]}**")
+            st.markdown(f"2. **{reviews[1]}**")
 
-        # Apply formatting only to numeric columns
-        st.dataframe(table_data.style.format({
-            'Discounted Price': '₹{:.2f}',
-            'Actual Price': '₹{:.2f}',
-            'Discount (%)': '{:.2f}%',
-            'Rating': '{:.1f}',
-            'Rating Count': '{:,}',
-        }))
+            st.markdown("---")
 
-        # Visualizations
-
-        # Price Bar Chart
-        st.subheader("Price Comparison")
-        st.plotly_chart(px.bar(
-            comparison_data, x='product_name', y=['discounted_price', 'actual_price'],
-            barmode='group', title="Price Comparison",
-            labels={"discounted_price": "Price (₹)", "actual_price": "Price (₹)"},
-            color='product_name'
-        ))
-
-        # Ratings Bar Chart
-        st.subheader("Rating Comparison")
-        st.plotly_chart(px.bar(
-            comparison_data, x='product_name', y='rating',
-            title="Ratings Comparison", color='product_name',
-            labels={"rating": "Rating (out of 5)"},
-            color_discrete_map={'product_name': 'rgb(255, 165, 0)'}
-        ))
-
-        # Radar Chart
-        st.subheader("Features Comparison")
-        radar_data = comparison_data[['product_name', 'discounted_price', 'rating', 'rating_count']].set_index('product_name')
+        # Visualizations (Radar chart, Heatmap, etc.)
+        st.subheader("Product Features Comparison (Radar Chart)")
+        radar_data = comparison_data[['Name', 'discounted_price', 'rating', 'rating_count']].set_index('Name')
         radar_data = radar_data.T  # Transpose for radar plotting
         radar_fig = go.Figure()
         for product in radar_data.columns:
@@ -162,14 +265,27 @@ def show_compare():
         )
         st.plotly_chart(radar_fig)
 
-        # Product Distribution Chart (Bubble Chart)
-        st.subheader("Price vs Rating Comparison")
-        fig = px.scatter(
-            comparison_data, x='discounted_price', y='rating', size='rating_count', hover_name='product_name',
-            title="Price vs Rating", labels={'discounted_price': 'Price (₹)', 'rating': 'Rating'},
-            color='rating', size_max=60, color_continuous_scale='Viridis'
-        )
-        st.plotly_chart(fig)
+        # Heatmap of Correlations
+        st.subheader("Correlation Heatmap")
+        corr_matrix = comparison_data[['discounted_price', 'actual_price', 'rating', 'rating_count']].corr()
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt='.2f', ax=ax)
+        st.pyplot(fig)
+
+        # Assign Points Based on Features (Example: Higher rating gets more points)
+        st.subheader("Point-Based Comparison Table")
+        points_data = comparison_data[['Name', 'rating', 'discounted_price', 'rating_count']].copy()
+        points_data['rating_points'] = points_data['rating'] * 10  # Example scoring logic: 10 points per rating point
+        points_data['price_points'] = points_data['discounted_price'].apply(lambda x: 1000 - x)  # Example: cheaper products get more points
+        points_data['total_points'] = points_data['rating_points'] + points_data['price_points']
+        points_data = points_data[['Name', 'rating_points', 'price_points', 'total_points']]
+
+        st.dataframe(points_data)
+
+        # Recommendation: Product with the highest points
+        best_product = points_data.loc[points_data['total_points'].idxmax()]
+        st.subheader("Recommended Product")
+        st.markdown(f"The product with the most points is **{best_product['Name']}** with **{best_product['total_points']} points**!")
 
     else:
         st.warning("Please select at least 2 products for comparison.")
@@ -177,8 +293,13 @@ def show_compare():
     st.markdown("---")
     st.markdown("© 2024 ProdRec Inc. | Built with ❤️ using Streamlit")
 
-# **Phone Comparison Functionality** (New Section)
 
+
+
+
+
+
+    
 # Load the phone data
 phone_data = pd.read_csv('prp.csv')
 
@@ -192,13 +313,37 @@ import seaborn as sns
 # Load the phone data
 phone_data = pd.read_csv('prp.csv')
 
+import plotly.express as px
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import streamlit as st
+
+import plotly.express as px
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import streamlit as st
+
+import plotly.express as px
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import streamlit as st
+
+import pandas as pd
+import plotly.express as px
+import matplotlib.pyplot as plt
+import seaborn as sns
+import streamlit as st
+
 def show_phone_comparison():
-    """Render Phone Comparison Section with Enhanced Visuals and Recommendations."""
+    """Render Phone Comparison Section with Advanced and Aesthetically Pleasing Visuals."""
     st.title("📱 Compare Phones")
 
     # Step 1: Select Phones for Comparison (Multiple Brands)
     brands = phone_data['Brand'].unique()
-    selected_brands = st.multiselect("Select Brands", brands, default=brands[:1])
+    selected_brands = st.multiselect("Select Brands", brands, default=brands[:1], key="brand_selector")
 
     # Prepare list to store selected phones
     selected_phones = []
@@ -206,7 +351,7 @@ def show_phone_comparison():
     for brand in selected_brands:
         brand_data = phone_data[phone_data['Brand'] == brand]
         models = brand_data['Model'].unique()
-        selected_model = st.selectbox(f"Select Phone from {brand}", models)
+        selected_model = st.selectbox(f"Select Phone from {brand}", models, key=f"model_selector_{brand}")
         selected_phones.append(selected_model)
 
     if len(selected_phones) >= 2:
@@ -217,7 +362,7 @@ def show_phone_comparison():
         comparison_data['Memory'] = comparison_data['Memory'].str.replace('GB', '').astype(int)
         comparison_data['Storage'] = comparison_data['Storage'].str.replace('GB', '').astype(int)
 
-        # Assign points for each feature
+        # Assign points for each feature (optional, based on your logic)
         def assign_points(phone):
             points = 0
             points += phone['Memory']  # Points for Memory (1 point per GB of RAM)
@@ -256,119 +401,67 @@ def show_phone_comparison():
 
         # Visualizations
 
-        # Visual 1: Price Distribution across Phones (Box plot)
-        st.subheader("Price Distribution")
-        fig = px.box(comparison_data, y='Selling Price', points='all', title="Price Distribution of Selected Phones")
+        # **Visual 1: Violin Plot of Rating Distribution by Model**
+        st.subheader("Rating Distribution by Model (Violin Plot)")
+        fig = px.violin(comparison_data, y='Rating', x='Model', color='Model', box=True, points="all", title="Rating Distribution by Model")
         st.plotly_chart(fig)
 
-        # Visual 2: RAM Comparison (Memory) (Bar chart)
-        st.subheader("RAM (Memory) Comparison")
-        fig = px.bar(comparison_data, x='Model', y='Memory', color='Model', title="RAM Comparison (in GB)")
+        # **Visual 2: Violin Plot of Selling Price Distribution by Model**
+        st.subheader("Selling Price Distribution by Model (Violin Plot)")
+        fig = px.violin(comparison_data, y='Selling Price', x='Model', color='Model', box=True, points="all", title="Selling Price Distribution by Model")
         st.plotly_chart(fig)
 
-        # Visual 3: Storage Comparison (Bar chart)
-        st.subheader("Storage (GB) Comparison")
-        fig = px.bar(comparison_data, x='Model', y='Storage', color='Model', title="Storage Capacity (in GB) Comparison")
+        # **Visual 3: Violin Plot of Memory (RAM) Distribution by Model**
+        st.subheader("Memory (RAM) Distribution by Model (Violin Plot)")
+        fig = px.violin(comparison_data, y='Memory', x='Model', color='Model', box=True, points="all", title="Memory (RAM) Distribution by Model")
         st.plotly_chart(fig)
 
-        # Visual 4: Rating Comparison (Bar chart)
-        st.subheader("Rating Comparison")
-        fig = px.bar(comparison_data, x='Model', y='Rating', color='Model', title="Ratings Comparison")
-        st.plotly_chart(fig)
-
-        # Visual 5: Scatter Plot of Price vs Rating
-        st.subheader("Price vs Rating Comparison")
-        fig = px.scatter(
-            comparison_data, x='Selling Price', y='Rating', size='Memory', hover_name='Model',
-            color='Model', title="Price vs Rating", labels={'Selling Price': 'Price (₹)', 'Rating': 'Rating (out of 5)'}
+        # **Visual 4: Parallel Coordinates Plot (for feature comparison)**
+        st.subheader("Parallel Coordinates Plot")
+        fig = px.parallel_coordinates(
+            comparison_data, color="Points", dimensions=["Memory", "Storage", "Rating", "Selling Price", "Points"],
+            title="Parallel Coordinates Plot for Feature Comparison"
         )
         st.plotly_chart(fig)
 
-        # Visual 6: Memory vs Price Comparison (Scatter plot)
-        st.subheader("Memory vs Price Comparison")
-        fig = px.scatter(
-            comparison_data, x='Memory', y='Selling Price', color='Model', title="Memory (RAM) vs Price Comparison",
-            labels={'Memory': 'Memory (GB)', 'Selling Price': 'Price (₹)'}
-        )
+        # **Visual 5: Radar Chart for Feature Comparison**
+        st.subheader("Radar Chart for Feature Comparison")
+        radar_data = comparison_data[['Model', 'Memory', 'Storage', 'Rating', 'Selling Price', 'Points']]
+        radar_data = radar_data.set_index('Model')
+        fig = px.line_polar(radar_data, r='Memory', theta=radar_data.index, line_close=True, title="Radar Chart of Phone Features")
         st.plotly_chart(fig)
 
-        # Visual 7: Points vs Price Comparison (Scatter plot)
-        st.subheader("Points vs Price Comparison")
-        fig = px.scatter(
-            comparison_data, x='Points', y='Selling Price', size='Rating', color='Model', title="Points vs Price",
-            labels={'Points': 'Points', 'Selling Price': 'Price (₹)'}
-        )
-        st.plotly_chart(fig)
-
-        # Visual 8: Storage vs Price (Bubble chart)
-        st.subheader("Storage vs Price")
-        fig = px.scatter(
-            comparison_data, x='Storage', y='Selling Price', size='Points', color='Model', title="Storage vs Price Comparison",
-            labels={'Storage': 'Storage (GB)', 'Selling Price': 'Price (₹)'}
-        )
-        st.plotly_chart(fig)
-
-        # Visual 9: Rating vs Storage (Bar chart)
-        st.subheader("Rating vs Storage")
-        fig = px.bar(
-            comparison_data, x='Model', y='Rating', color='Storage', title="Rating vs Storage (in GB)",
-            labels={'Rating': 'Rating (out of 5)', 'Storage': 'Storage (GB)'}
-        )
-        st.plotly_chart(fig)
-
-        # Visual 10: Storage to Price Ratio Comparison
-        st.subheader("Storage to Price Ratio")
-        comparison_data['Storage/Price'] = comparison_data['Storage'] / comparison_data['Selling Price']
-        fig = px.bar(
-            comparison_data, x='Model', y='Storage/Price', color='Model', title="Storage to Price Ratio Comparison",
-            labels={'Storage/Price': 'Storage/Price Ratio'}
-        )
-        st.plotly_chart(fig)
-
-        # Visual 11: Correlation Heatmap (Numerical Data)
+        # **Visual 6: Correlation Heatmap (Numerical Data)**
         st.subheader("Correlation Heatmap")
         corr = comparison_data[['Memory', 'Storage', 'Rating', 'Selling Price', 'Original Price', 'Points']].corr()
         plt.figure(figsize=(8, 6))
         sns.heatmap(corr, annot=True, cmap='coolwarm', fmt='.2f', linewidths=0.5)
         st.pyplot(plt)
 
-        # Visual 12: Distribution of Points (Histogram)
+        # **Visual 7: Distribution of Points (Histogram)**
         st.subheader("Points Distribution")
         fig = px.histogram(comparison_data, x='Points', title="Distribution of Points across Phones", color='Model')
         st.plotly_chart(fig)
 
-        # Visual 13: Distribution of Selling Price (Histogram)
-        st.subheader("Selling Price Distribution")
-        fig = px.histogram(comparison_data, x='Selling Price', title="Selling Price Distribution", color='Model')
+        # **Visual 8: Line Plot of Selling Price vs Rating (Trend analysis)**
+        st.subheader("Selling Price vs Rating Trend (Line Plot)")
+        fig = px.line(comparison_data, x='Selling Price', y='Rating', color='Model', markers=True, title="Selling Price vs Rating Trend")
         st.plotly_chart(fig)
 
-        # Visual 14: Radar Chart (Feature Comparison)
-        st.subheader("Radar Chart for Feature Comparison")
-        fig = px.line_polar(comparison_data, r='Points', theta='Model', line_close=True, title="Radar Chart of Phone Features")
+        # **Visual 9: Line Plot of Storage vs Points (Trend analysis)**
+        st.subheader("Storage vs Points Trend (Line Plot)")
+        fig = px.line(comparison_data, x='Storage', y='Points', color='Model', markers=True, title="Storage vs Points Trend")
         st.plotly_chart(fig)
 
-        # Visual 15: Parallel Coordinates for All Features Comparison
-        st.subheader("Parallel Coordinates for All Features Comparison")
-
-        # Create the Parallel Coordinates Plot using 'Points' for color scaling
-        fig = px.parallel_coordinates(
-            comparison_data, 
-            dimensions=['Memory', 'Storage', 'Rating', 'Selling Price', 'Points'], 
-            color='Points',  # Color based on the numerical 'Points' feature
-            color_continuous_scale='Viridis',  # Continuous color scale (can be changed)
-            labels={'Memory': 'RAM (GB)', 'Storage': 'Storage (GB)', 'Selling Price': 'Price (₹)', 'Points': 'Total Points'}
-        )
-    
-        # Display the plot
+        # **Visual 10: Line Plot of Memory vs Selling Price (Trend analysis)**
+        st.subheader("Memory (RAM) vs Selling Price Trend (Line Plot)")
+        fig = px.line(comparison_data, x='Memory', y='Selling Price', color='Model', markers=True, title="Memory (RAM) vs Selling Price Trend")
         st.plotly_chart(fig)
 
-    else:
-        # Show warning if less than 2 phones are selected for comparison
-        st.warning("Please select at least 2 phones for comparison.")
+# Call the function to show phone comparison when running the app
 
-    # Footer
-    st.markdown("---")
-    st.markdown("© 2024 ProdRec Inc. | Built with ❤️ using Streamlit")
+
+
 
 
 
@@ -388,3 +481,4 @@ elif page == "Compare Products":
 elif page == "Compare Phones":
     load_css()
     show_phone_comparison()
+
