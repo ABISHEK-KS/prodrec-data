@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 # Configurations
 st.set_page_config(page_title="ProdRec - Product Comparison Platform", page_icon="🛍️", layout="wide")
@@ -101,6 +103,7 @@ def show_compare():
         st.subheader("Comparison Table")
         table_data = comparison_data[['product_name', 'discounted_price', 'actual_price',
                                       'discount_percentage', 'rating', 'rating_count', 'about_product']]
+
         table_data = table_data.rename(columns={
             'product_name': 'Product Name',
             'discounted_price': 'Discounted Price',
@@ -123,6 +126,7 @@ def show_compare():
         # Visualizations
 
         # Price Bar Chart
+        st.subheader("Price Comparison")
         st.plotly_chart(px.bar(
             comparison_data, x='product_name', y=['discounted_price', 'actual_price'],
             barmode='group', title="Price Comparison",
@@ -131,6 +135,7 @@ def show_compare():
         ))
 
         # Ratings Bar Chart
+        st.subheader("Rating Comparison")
         st.plotly_chart(px.bar(
             comparison_data, x='product_name', y='rating',
             title="Ratings Comparison", color='product_name',
@@ -139,7 +144,7 @@ def show_compare():
         ))
 
         # Radar Chart
-        st.subheader("Feature Comparison (Radar Chart)")
+        st.subheader("Features Comparison")
         radar_data = comparison_data[['product_name', 'discounted_price', 'rating', 'rating_count']].set_index('product_name')
         radar_data = radar_data.T  # Transpose for radar plotting
         radar_fig = go.Figure()
@@ -158,7 +163,7 @@ def show_compare():
         st.plotly_chart(radar_fig)
 
         # Product Distribution Chart (Bubble Chart)
-        st.subheader("Price vs Rating Distribution")
+        st.subheader("Price vs Rating Comparison")
         fig = px.scatter(
             comparison_data, x='discounted_price', y='rating', size='rating_count', hover_name='product_name',
             title="Price vs Rating", labels={'discounted_price': 'Price (₹)', 'rating': 'Rating'},
@@ -178,7 +183,7 @@ def show_compare():
 phone_data = pd.read_csv('prp.csv')
 
 def show_phone_comparison():
-    """Render Phone Comparison Section with Enhanced Visuals."""
+    """Render Phone Comparison Section with Enhanced Visuals and Recommendations."""
     st.title("📱 Compare Phones")
 
     # Step 1: Select Phones for Comparison (Multiple Brands)
@@ -198,77 +203,148 @@ def show_phone_comparison():
         # Filter the data for selected models
         comparison_data = phone_data[phone_data['Model'].isin(selected_phones)]
 
+        # **Convert 'Memory' and 'Storage' to numeric (cleaning data properly)**
+        comparison_data['Memory'] = comparison_data['Memory'].str.replace('GB', '').astype(int)
+        comparison_data['Storage'] = comparison_data['Storage'].str.replace('GB', '').astype(int)
+
+        # Assign points for each feature
+        def assign_points(phone):
+            points = 0
+
+            # Points for Memory (RAM) (1 point per GB of RAM)
+            points += phone['Memory']
+
+            # Points for Storage (1 point per 64 GB of Storage)
+            points += phone['Storage'] / 64  # Divide by 64 to scale it reasonably
+
+            # Points for Rating (Maximum 10 points for a 5-star rating)
+            points += phone['Rating'] * 2  # 2 points per rating star
+
+            # Points for Selling Price (Inverse scoring: lower price gets more points)
+            points += 100000 / phone['Selling Price']  # Arbitrary scaling to make it comparable
+
+            return points
+
+        # Calculate points for each phone
+        comparison_data['Points'] = comparison_data.apply(assign_points, axis=1)
+
         # Display comparison table
         st.subheader("Phone Comparison Table")
-        table_data = comparison_data[['Brand', 'Model', 'Color', 'Memory', 'Storage', 'Rating', 'Selling Price', 'Original Price']]
+        table_data = comparison_data[['Brand', 'Model', 'Color', 'Memory', 'Storage', 'Rating', 'Selling Price', 'Original Price', 'Points']]
         table_data = table_data.rename(columns={
             'Brand': 'Brand',
             'Model': 'Model',
             'Color': 'Color',
-            'Memory': 'Memory',
-            'Storage': 'Storage',
+            'Memory': 'Memory (GB)',
+            'Storage': 'Storage (GB)',
             'Rating': 'Rating',
             'Selling Price': 'Selling Price (₹)',
-            'Original Price': 'Original Price (₹)'
+            'Original Price': 'Original Price (₹)',
+            'Points': 'Points'
         })
         st.dataframe(table_data)
 
-        # **1. Price Distribution Plot**
-        st.subheader("Price Distribution of Selected Phones")
-        fig_price_dist = px.box(
-            comparison_data, x='Model', y='Selling Price',
-            title="Price Distribution for Selected Phones",
-            labels={'Selling Price': 'Price (₹)', 'Model': 'Phone Model'},
-            points='all'
-        )
-        st.plotly_chart(fig_price_dist)
+        # **Phone Recommendation: Best Overall Score**
+        st.markdown("### 📱 Recommended Phone: Best Features")
+        # Find the phone with the highest total points
+        best_phone = comparison_data.loc[comparison_data['Points'].idxmax()]
+        st.write(f"The phone with the **best features** is **{best_phone['Model']}** by {best_phone['Brand']}.")
+        st.write(f"**Total Points**: {best_phone['Points']}")
+        st.write(f"**Selling Price**: ₹{best_phone['Selling Price']}")
+        st.write(f"**Rating**: {best_phone['Rating']} stars")
 
-        # **2. Storage vs. Memory Scatter Plot**
-        st.subheader("Storage vs Memory Scatter Plot")
-        fig_storage_memory = px.scatter(
-            comparison_data, 
-            x='Storage', 
-            y='Memory', 
-            color='Model', 
-            size='Selling Price', 
-            hover_name='Model', 
-            title="Storage vs Memory for Selected Phones",
-            labels={'Storage': 'Storage (GB)', 'Memory': 'Memory (GB)'}
-        )
-        st.plotly_chart(fig_storage_memory)
-
-        # **3. Rating Distribution Histogram**
-        st.subheader("Rating Distribution Histogram")
-        fig_rating_dist = px.histogram(
-            comparison_data, 
-            x='Rating', 
-            color='Model', 
-            title="Rating Distribution for Selected Phones",
-            labels={'Rating': 'Rating (out of 5)'}
-        )
-        fig_rating_dist.update_layout(bargap=0.2)
-        st.plotly_chart(fig_rating_dist)
-
-        # **4. Comparison of Colors (Pie Chart)**
-        st.subheader("Phone Colors Distribution")
-        color_counts = comparison_data['Color'].value_counts()
-        fig_color_dist = px.pie(
-            names=color_counts.index, 
-            values=color_counts.values, 
-            title="Color Distribution of Selected Phones"
-        )
-        st.plotly_chart(fig_color_dist)
-
-        # **Price Bar Chart for Phones**
-        st.plotly_chart(px.bar(
-            comparison_data, x='Model', y=['Selling Price', 'Original Price'],
-            barmode='group', title="Price Comparison of Selected Phones",
-            labels={"Selling Price": "Selling Price (₹)", "Original Price": "Original Price (₹)"}
+        # 1. **Price vs Rating Scatter Plot**
+        st.subheader("Price vs Rating")
+        st.plotly_chart(px.scatter(
+            comparison_data, x='Selling Price', y='Rating',
+            title="Price vs Rating Comparison", color='Model',
+            labels={'Selling Price': 'Price (₹)', 'Rating': 'Rating (out of 5)'}
         ))
+
+        # 2. **Memory Distribution Histogram**
+        st.subheader("Memory (RAM) Distribution")
+        fig = plt.figure()
+        sns.histplot(comparison_data['Memory'], kde=True, color='skyblue')
+        plt.title('Distribution of Memory (RAM) in GB')
+        st.pyplot(fig)
+
+        # 3. **Storage Distribution Histogram**
+        st.subheader("Storage Distribution")
+        fig = plt.figure()
+        sns.histplot(comparison_data['Storage'], kde=True, color='green')
+        plt.title('Distribution of Storage (GB)')
+        st.pyplot(fig)
+
+        # 4. **Rating Distribution Histogram**
+        st.subheader("Rating Distribution")
+        fig = plt.figure()
+        sns.histplot(comparison_data['Rating'], kde=True, color='orange')
+        plt.title('Distribution of Ratings')
+        st.pyplot(fig)
+
+        # 5. **Price Distribution Box Plot**
+        st.subheader("Price Distribution (Box Plot)")
+        fig = plt.figure()
+        sns.boxplot(x=comparison_data['Selling Price'], color='lightcoral')
+        plt.title('Price Distribution')
+        st.pyplot(fig)
+
+        # 6. **RAM vs Storage Scatter Plot**
+        st.subheader("RAM vs Storage")
+        st.plotly_chart(px.scatter(
+            comparison_data, x='Memory', y='Storage',
+            title="RAM vs Storage", color='Model',
+            labels={'Memory': 'Memory (GB)', 'Storage': 'Storage (GB)'}
+        ))
+
+        # 7. **Price vs Memory Scatter Plot**
+        st.subheader("Price vs Memory")
+        st.plotly_chart(px.scatter(
+            comparison_data, x='Selling Price', y='Memory',
+            title="Price vs Memory (RAM)", color='Model',
+            labels={'Selling Price': 'Price (₹)', 'Memory': 'Memory (GB)'}
+        ))
+
+        # 8. **Heatmap of Feature Correlations**
+        st.subheader("Feature Correlation Heatmap")
+        corr_matrix = comparison_data[['Memory', 'Storage', 'Rating', 'Selling Price', 'Points']].corr()
+        fig = plt.figure()
+        sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt='.2f')
+        plt.title('Feature Correlation Heatmap')
+        st.pyplot(fig)
+
+        # 9. **Feature Comparison Radar Chart (Spider Plot)**
+        st.subheader("Features Comparison (Radar Chart)")
+        radar_data = comparison_data[['Model', 'Memory', 'Storage', 'Rating', 'Selling Price']].set_index('Model')
+        radar_data = radar_data.T  # Transpose for radar plotting
+        radar_fig = go.Figure()
+        for model in radar_data.columns:
+            radar_fig.add_trace(go.Scatterpolar(
+                r=radar_data[model],
+                theta=radar_data.index,
+                fill='toself',
+                name=model
+            ))
+        radar_fig.update_layout(
+            polar=dict(radialaxis=dict(visible=True)),
+            showlegend=True,
+            title="Phone Features Comparison"
+        )
+        st.plotly_chart(radar_fig)
+
+        # 10. **Feature Rating Breakdown Table**
+        st.subheader("Feature Rating Breakdown")
+        rating_table = comparison_data[['Model', 'Memory', 'Storage', 'Rating', 'Selling Price', 'Points']]
+        rating_table['Memory Points'] = rating_table['Memory']
+        rating_table['Storage Points'] = rating_table['Storage'] / 64
+        rating_table['Rating Points'] = rating_table['Rating'] * 2
+        rating_table['Price Points'] = 100000 / rating_table['Selling Price']
+        
+        st.write(rating_table)
 
     else:
         st.warning("Please select at least 2 phones for comparison.")
-    
+
 # Sidebar Navigation
 st.sidebar.title("Navigation")
 page = st.sidebar.selectbox("Go to", ["Home", "Compare Products", "Compare Phones"])
