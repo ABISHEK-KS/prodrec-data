@@ -182,6 +182,16 @@ def show_compare():
 # Load the phone data
 phone_data = pd.read_csv('prp.csv')
 
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load the phone data
+phone_data = pd.read_csv('prp.csv')
+
 def show_phone_comparison():
     """Render Phone Comparison Section with Enhanced Visuals and Recommendations."""
     st.title("📱 Compare Phones")
@@ -203,26 +213,17 @@ def show_phone_comparison():
         # Filter the data for selected models
         comparison_data = phone_data[phone_data['Model'].isin(selected_phones)]
 
-        # **Convert 'Memory' and 'Storage' to numeric (cleaning data properly)**
+        # Convert 'Memory' and 'Storage' to numeric (removing 'GB' and converting to integer)
         comparison_data['Memory'] = comparison_data['Memory'].str.replace('GB', '').astype(int)
         comparison_data['Storage'] = comparison_data['Storage'].str.replace('GB', '').astype(int)
 
         # Assign points for each feature
         def assign_points(phone):
             points = 0
-
-            # Points for Memory (RAM) (1 point per GB of RAM)
-            points += phone['Memory']
-
-            # Points for Storage (1 point per 64 GB of Storage)
-            points += phone['Storage'] / 64  # Divide by 64 to scale it reasonably
-
-            # Points for Rating (Maximum 10 points for a 5-star rating)
-            points += phone['Rating'] * 2  # 2 points per rating star
-
-            # Points for Selling Price (Inverse scoring: lower price gets more points)
-            points += 100000 / phone['Selling Price']  # Arbitrary scaling to make it comparable
-
+            points += phone['Memory']  # Points for Memory (1 point per GB of RAM)
+            points += phone['Storage'] / 64  # Points for Storage (1 point per 64 GB of Storage)
+            points += phone['Rating'] * 2  # Points for Rating (Maximum 10 points for a 5-star rating)
+            points += 100000 / phone['Selling Price']  # Inverse scoring: lower price gets more points
             return points
 
         # Calculate points for each phone
@@ -245,105 +246,132 @@ def show_phone_comparison():
         st.dataframe(table_data)
 
         # **Phone Recommendation: Best Overall Score**
-        st.markdown("### 📱 Recommended Phone: Best Features")
-        # Find the phone with the highest total points
         best_phone = comparison_data.loc[comparison_data['Points'].idxmax()]
+        st.markdown("### 📱 **Recommended Phone with the Best Features**")
         st.write(f"The phone with the **best features** is **{best_phone['Model']}** by {best_phone['Brand']}.")
         st.write(f"**Total Points**: {best_phone['Points']}")
         st.write(f"**Selling Price**: ₹{best_phone['Selling Price']}")
         st.write(f"**Rating**: {best_phone['Rating']} stars")
+        st.write(f"**Best Buy**: This phone offers the most balanced combination of **features, performance**, and **price**!")
 
-        # 1. **Price vs Rating Scatter Plot**
-        st.subheader("Price vs Rating")
-        st.plotly_chart(px.scatter(
-            comparison_data, x='Selling Price', y='Rating',
-            title="Price vs Rating Comparison", color='Model',
-            labels={'Selling Price': 'Price (₹)', 'Rating': 'Rating (out of 5)'}
-        ))
+        # Visualizations
 
-        # 2. **Memory Distribution Histogram**
-        st.subheader("Memory (RAM) Distribution")
-        fig = plt.figure()
-        sns.histplot(comparison_data['Memory'], kde=True, color='skyblue')
-        plt.title('Distribution of Memory (RAM) in GB')
-        st.pyplot(fig)
+        # Visual 1: Price Distribution across Phones (Box plot)
+        st.subheader("Price Distribution")
+        fig = px.box(comparison_data, y='Selling Price', points='all', title="Price Distribution of Selected Phones")
+        st.plotly_chart(fig)
 
-        # 3. **Storage Distribution Histogram**
-        st.subheader("Storage Distribution")
-        fig = plt.figure()
-        sns.histplot(comparison_data['Storage'], kde=True, color='green')
-        plt.title('Distribution of Storage (GB)')
-        st.pyplot(fig)
+        # Visual 2: RAM Comparison (Memory) (Bar chart)
+        st.subheader("RAM (Memory) Comparison")
+        fig = px.bar(comparison_data, x='Model', y='Memory', color='Model', title="RAM Comparison (in GB)")
+        st.plotly_chart(fig)
 
-        # 4. **Rating Distribution Histogram**
-        st.subheader("Rating Distribution")
-        fig = plt.figure()
-        sns.histplot(comparison_data['Rating'], kde=True, color='orange')
-        plt.title('Distribution of Ratings')
-        st.pyplot(fig)
+        # Visual 3: Storage Comparison (Bar chart)
+        st.subheader("Storage (GB) Comparison")
+        fig = px.bar(comparison_data, x='Model', y='Storage', color='Model', title="Storage Capacity (in GB) Comparison")
+        st.plotly_chart(fig)
 
-        # 5. **Price Distribution Box Plot**
-        st.subheader("Price Distribution (Box Plot)")
-        fig = plt.figure()
-        sns.boxplot(x=comparison_data['Selling Price'], color='lightcoral')
-        plt.title('Price Distribution')
-        st.pyplot(fig)
+        # Visual 4: Rating Comparison (Bar chart)
+        st.subheader("Rating Comparison")
+        fig = px.bar(comparison_data, x='Model', y='Rating', color='Model', title="Ratings Comparison")
+        st.plotly_chart(fig)
 
-        # 6. **RAM vs Storage Scatter Plot**
-        st.subheader("RAM vs Storage")
-        st.plotly_chart(px.scatter(
-            comparison_data, x='Memory', y='Storage',
-            title="RAM vs Storage", color='Model',
-            labels={'Memory': 'Memory (GB)', 'Storage': 'Storage (GB)'}
-        ))
-
-        # 7. **Price vs Memory Scatter Plot**
-        st.subheader("Price vs Memory")
-        st.plotly_chart(px.scatter(
-            comparison_data, x='Selling Price', y='Memory',
-            title="Price vs Memory (RAM)", color='Model',
-            labels={'Selling Price': 'Price (₹)', 'Memory': 'Memory (GB)'}
-        ))
-
-        # 8. **Heatmap of Feature Correlations**
-        st.subheader("Feature Correlation Heatmap")
-        corr_matrix = comparison_data[['Memory', 'Storage', 'Rating', 'Selling Price', 'Points']].corr()
-        fig = plt.figure()
-        sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt='.2f')
-        plt.title('Feature Correlation Heatmap')
-        st.pyplot(fig)
-
-        # 9. **Feature Comparison Radar Chart (Spider Plot)**
-        st.subheader("Features Comparison (Radar Chart)")
-        radar_data = comparison_data[['Model', 'Memory', 'Storage', 'Rating', 'Selling Price']].set_index('Model')
-        radar_data = radar_data.T  # Transpose for radar plotting
-        radar_fig = go.Figure()
-        for model in radar_data.columns:
-            radar_fig.add_trace(go.Scatterpolar(
-                r=radar_data[model],
-                theta=radar_data.index,
-                fill='toself',
-                name=model
-            ))
-        radar_fig.update_layout(
-            polar=dict(radialaxis=dict(visible=True)),
-            showlegend=True,
-            title="Phone Features Comparison"
+        # Visual 5: Scatter Plot of Price vs Rating
+        st.subheader("Price vs Rating Comparison")
+        fig = px.scatter(
+            comparison_data, x='Selling Price', y='Rating', size='Memory', hover_name='Model',
+            color='Model', title="Price vs Rating", labels={'Selling Price': 'Price (₹)', 'Rating': 'Rating (out of 5)'}
         )
-        st.plotly_chart(radar_fig)
+        st.plotly_chart(fig)
 
-        # 10. **Feature Rating Breakdown Table**
-        st.subheader("Feature Rating Breakdown")
-        rating_table = comparison_data[['Model', 'Memory', 'Storage', 'Rating', 'Selling Price', 'Points']]
-        rating_table['Memory Points'] = rating_table['Memory']
-        rating_table['Storage Points'] = rating_table['Storage'] / 64
-        rating_table['Rating Points'] = rating_table['Rating'] * 2
-        rating_table['Price Points'] = 100000 / rating_table['Selling Price']
-        
-        st.write(rating_table)
+        # Visual 6: Memory vs Price Comparison (Scatter plot)
+        st.subheader("Memory vs Price Comparison")
+        fig = px.scatter(
+            comparison_data, x='Memory', y='Selling Price', color='Model', title="Memory (RAM) vs Price Comparison",
+            labels={'Memory': 'Memory (GB)', 'Selling Price': 'Price (₹)'}
+        )
+        st.plotly_chart(fig)
+
+        # Visual 7: Points vs Price Comparison (Scatter plot)
+        st.subheader("Points vs Price Comparison")
+        fig = px.scatter(
+            comparison_data, x='Points', y='Selling Price', size='Rating', color='Model', title="Points vs Price",
+            labels={'Points': 'Points', 'Selling Price': 'Price (₹)'}
+        )
+        st.plotly_chart(fig)
+
+        # Visual 8: Storage vs Price (Bubble chart)
+        st.subheader("Storage vs Price")
+        fig = px.scatter(
+            comparison_data, x='Storage', y='Selling Price', size='Points', color='Model', title="Storage vs Price Comparison",
+            labels={'Storage': 'Storage (GB)', 'Selling Price': 'Price (₹)'}
+        )
+        st.plotly_chart(fig)
+
+        # Visual 9: Rating vs Storage (Bar chart)
+        st.subheader("Rating vs Storage")
+        fig = px.bar(
+            comparison_data, x='Model', y='Rating', color='Storage', title="Rating vs Storage (in GB)",
+            labels={'Rating': 'Rating (out of 5)', 'Storage': 'Storage (GB)'}
+        )
+        st.plotly_chart(fig)
+
+        # Visual 10: Storage to Price Ratio Comparison
+        st.subheader("Storage to Price Ratio")
+        comparison_data['Storage/Price'] = comparison_data['Storage'] / comparison_data['Selling Price']
+        fig = px.bar(
+            comparison_data, x='Model', y='Storage/Price', color='Model', title="Storage to Price Ratio Comparison",
+            labels={'Storage/Price': 'Storage/Price Ratio'}
+        )
+        st.plotly_chart(fig)
+
+        # Visual 11: Correlation Heatmap (Numerical Data)
+        st.subheader("Correlation Heatmap")
+        corr = comparison_data[['Memory', 'Storage', 'Rating', 'Selling Price', 'Original Price', 'Points']].corr()
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(corr, annot=True, cmap='coolwarm', fmt='.2f', linewidths=0.5)
+        st.pyplot(plt)
+
+        # Visual 12: Distribution of Points (Histogram)
+        st.subheader("Points Distribution")
+        fig = px.histogram(comparison_data, x='Points', title="Distribution of Points across Phones", color='Model')
+        st.plotly_chart(fig)
+
+        # Visual 13: Distribution of Selling Price (Histogram)
+        st.subheader("Selling Price Distribution")
+        fig = px.histogram(comparison_data, x='Selling Price', title="Selling Price Distribution", color='Model')
+        st.plotly_chart(fig)
+
+        # Visual 14: Radar Chart (Feature Comparison)
+        st.subheader("Radar Chart for Feature Comparison")
+        fig = px.line_polar(comparison_data, r='Points', theta='Model', line_close=True, title="Radar Chart of Phone Features")
+        st.plotly_chart(fig)
+
+        # Visual 15: Parallel Coordinates for All Features Comparison
+        st.subheader("Parallel Coordinates for All Features Comparison")
+
+        # Create the Parallel Coordinates Plot using 'Points' for color scaling
+        fig = px.parallel_coordinates(
+            comparison_data, 
+            dimensions=['Memory', 'Storage', 'Rating', 'Selling Price', 'Points'], 
+            color='Points',  # Color based on the numerical 'Points' feature
+            color_continuous_scale='Viridis',  # Continuous color scale (can be changed)
+            labels={'Memory': 'RAM (GB)', 'Storage': 'Storage (GB)', 'Selling Price': 'Price (₹)', 'Points': 'Total Points'}
+        )
+    
+        # Display the plot
+        st.plotly_chart(fig)
 
     else:
+        # Show warning if less than 2 phones are selected for comparison
         st.warning("Please select at least 2 phones for comparison.")
+
+    # Footer
+    st.markdown("---")
+    st.markdown("© 2024 ProdRec Inc. | Built with ❤️ using Streamlit")
+
+
+
 
 # Sidebar Navigation
 st.sidebar.title("Navigation")
