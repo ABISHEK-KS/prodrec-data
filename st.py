@@ -2,36 +2,50 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import plotly.figure_factory as ff
 
 # Configurations
-st.set_page_config(page_title="ProdRec - Product Comparison Platform",
-                   page_icon="🛍️",
-                   layout="wide")
+st.set_page_config(page_title="ProdRec - Product Comparison Platform", page_icon="🛍️", layout="wide")
+
+# Load and Apply External CSS (if exists)
+def load_css():
+    """Reads external CSS and applies it."""
+    try:
+        with open("externalcss.css", "r") as f:
+            css = f.read()
+            st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning("CSS file 'externalcss.css' not found. Make sure it is in the correct directory.")
 
 # Helper Functions
 @st.cache_data
 def load_data(file_path):
-    """Load dataset from a local CSV file and return a copy to avoid mutation."""
-    return pd.read_csv(file_path).copy()
+    """Load dataset from a local Excel file and return a copy to avoid mutation."""
+    data = pd.read_csv(file_path)
+    
+    # Check if 'category' column exists
+    if 'category' not in data.columns:
+        raise ValueError("'category' column not found in the dataset.")
+    
+    # Parse categories
+    data = parse_categories(data)
+    
+    return data
 
 def parse_categories(data):
     """Parse categories with synonyms separated by '|'."""
-    data['parsed_category'] = data['category'].apply(lambda x: x.split('|')[0])
+    data['parsed_category'] = data['category'].apply(lambda x: x.split('|')[0] if isinstance(x, str) else 'Unknown')
     return data
 
 def show_home():
     """Render the Home Page."""
     st.title("Welcome to **ProdRec**")
     st.subheader("Your Trusted Companion in Smarter Shopping Decisions")
-    st.markdown("""
-    At **ProdRec**, we simplify your shopping journey by helping you:
+    st.markdown("""At **ProdRec**, we simplify your shopping journey by helping you:
     - Discover products tailored to your needs and budget.
     - Compare features, prices, and ratings side-by-side.
     - Decide with confidence, backed by clear, transparent insights.
 
-    Let’s make your shopping experience smarter, easier, and more rewarding.
-    """)
+    Let’s make your shopping experience smarter, easier, and more rewarding.""")
     st.image(
         "https://via.placeholder.com/1200x500.png?text=Your+Product+Comparison+Starts+Here!",
         use_column_width=True,
@@ -54,16 +68,15 @@ def show_compare():
     st.title("🔍 Compare Products")
     st.markdown("Compare products based on **category**, **price**, **ratings**, and other features.")
 
-    # Load Dataset
-    DATA_FILE = "prodrecdata.csv"
+    # Load Dataset for General Comparison
+    DATA_FILE = "pr.csv"
     try:
         data = load_data(DATA_FILE)  # Now returns a copy, so it won't mutate cached data
-        data = parse_categories(data)
     except Exception as e:
         st.error(f"Could not load the dataset. Make sure '{DATA_FILE}' exists in the same directory.\nError: {e}")
         return
 
-    # Category Selection
+    # Category Selection for General Product Comparison
     unique_categories = data['parsed_category'].dropna().unique()
     selected_category = st.selectbox("Select a Category", unique_categories)
 
@@ -105,7 +118,7 @@ def show_compare():
             'Discount (%)': '{:.2f}%',
             'Rating': '{:.1f}',
             'Rating Count': '{:,}',
-        }).hide_index())
+        }))
 
         # Visualizations
 
@@ -159,45 +172,115 @@ def show_compare():
     st.markdown("---")
     st.markdown("© 2024 ProdRec Inc. | Built with ❤️ using Streamlit")
 
-# Sidebar Button-style Navigation (CSS Customization)
-sidebar_style = """
-    <style>
-    .sidebar .sidebar-content {
-        background-color: #262730;
-        color: white;
-    }
-    .sidebar .sidebar-content .stButton>button {
-        background-color: #1f77b4;
-        color: white;
-        font-weight: bold;
-        padding: 10px 20px;
-        border-radius: 5px;
-        font-size: 16px;
-        width: 100%;
-        margin-bottom: 10px;
-    }
-    .sidebar .sidebar-content .stButton>button:hover {
-        background-color: #155a8a;
-    }
-    </style>
-"""
-st.markdown(sidebar_style, unsafe_allow_html=True)
+# **Phone Comparison Functionality** (New Section)
 
-# Button-based Sidebar Navigation with Session State
+# Load the phone data
+phone_data = pd.read_csv('prp.csv')
+
+def show_phone_comparison():
+    """Render Phone Comparison Section with Enhanced Visuals."""
+    st.title("📱 Compare Phones")
+
+    # Step 1: Select Phones for Comparison (Multiple Brands)
+    brands = phone_data['Brand'].unique()
+    selected_brands = st.multiselect("Select Brands", brands, default=brands[:1])
+
+    # Prepare list to store selected phones
+    selected_phones = []
+
+    for brand in selected_brands:
+        brand_data = phone_data[phone_data['Brand'] == brand]
+        models = brand_data['Model'].unique()
+        selected_model = st.selectbox(f"Select Phone from {brand}", models)
+        selected_phones.append(selected_model)
+
+    if len(selected_phones) >= 2:
+        # Filter the data for selected models
+        comparison_data = phone_data[phone_data['Model'].isin(selected_phones)]
+
+        # Display comparison table
+        st.subheader("Phone Comparison Table")
+        table_data = comparison_data[['Brand', 'Model', 'Color', 'Memory', 'Storage', 'Rating', 'Selling Price', 'Original Price']]
+        table_data = table_data.rename(columns={
+            'Brand': 'Brand',
+            'Model': 'Model',
+            'Color': 'Color',
+            'Memory': 'Memory',
+            'Storage': 'Storage',
+            'Rating': 'Rating',
+            'Selling Price': 'Selling Price (₹)',
+            'Original Price': 'Original Price (₹)'
+        })
+        st.dataframe(table_data)
+
+        # **1. Price Distribution Plot**
+        st.subheader("Price Distribution of Selected Phones")
+        fig_price_dist = px.box(
+            comparison_data, x='Model', y='Selling Price',
+            title="Price Distribution for Selected Phones",
+            labels={'Selling Price': 'Price (₹)', 'Model': 'Phone Model'},
+            points='all'
+        )
+        st.plotly_chart(fig_price_dist)
+
+        # **2. Storage vs. Memory Scatter Plot**
+        st.subheader("Storage vs Memory Scatter Plot")
+        fig_storage_memory = px.scatter(
+            comparison_data, 
+            x='Storage', 
+            y='Memory', 
+            color='Model', 
+            size='Selling Price', 
+            hover_name='Model', 
+            title="Storage vs Memory for Selected Phones",
+            labels={'Storage': 'Storage (GB)', 'Memory': 'Memory (GB)'}
+        )
+        st.plotly_chart(fig_storage_memory)
+
+        # **3. Rating Distribution Histogram**
+        st.subheader("Rating Distribution Histogram")
+        fig_rating_dist = px.histogram(
+            comparison_data, 
+            x='Rating', 
+            color='Model', 
+            title="Rating Distribution for Selected Phones",
+            labels={'Rating': 'Rating (out of 5)'}
+        )
+        fig_rating_dist.update_layout(bargap=0.2)
+        st.plotly_chart(fig_rating_dist)
+
+        # **4. Comparison of Colors (Pie Chart)**
+        st.subheader("Phone Colors Distribution")
+        color_counts = comparison_data['Color'].value_counts()
+        fig_color_dist = px.pie(
+            names=color_counts.index, 
+            values=color_counts.values, 
+            title="Color Distribution of Selected Phones"
+        )
+        st.plotly_chart(fig_color_dist)
+
+        # **Price Bar Chart for Phones**
+        st.plotly_chart(px.bar(
+            comparison_data, x='Model', y=['Selling Price', 'Original Price'],
+            barmode='group', title="Price Comparison of Selected Phones",
+            labels={"Selling Price": "Selling Price (₹)", "Original Price": "Original Price (₹)"}
+        ))
+
+    else:
+        st.warning("Please select at least 2 phones for comparison.")
+    
+# Sidebar Navigation
 st.sidebar.title("Navigation")
+page = st.sidebar.selectbox("Go to", ["Home", "Compare Products", "Compare Phones"])
 
-# Initialize session state if not present
-if 'page' not in st.session_state:
-    st.session_state.page = 'home'  # Default page
-
-# Sidebar buttons for page navigation
-if st.sidebar.button("🏠 Home"):
-    st.session_state.page = 'home'
-elif st.sidebar.button("🔍 Compare Products"):
-    st.session_state.page = 'compare'
-
-# Show the selected page content
-if st.session_state.page == 'home':
+if page == "Home":
+    load_css()
     show_home()
-elif st.session_state.page == 'compare':
+
+elif page == "Compare Products":
+    load_css()
     show_compare()
+
+elif page == "Compare Phones":
+    load_css()
+    show_phone_comparison()
