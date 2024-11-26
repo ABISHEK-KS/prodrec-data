@@ -4,6 +4,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 import seaborn as sns
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import os
+import re
+import numpy as np
 
 # Configurations
 st.set_page_config(page_title="ProdRec - Product Comparison Platform", page_icon="🛍️", layout="wide")
@@ -95,6 +99,8 @@ def parse_categories(data):
     data['parsed_category'] = data['Category'].apply(lambda x: x.split('|')[0] if isinstance(x, str) else 'Unknown')
     return data
 
+
+
 def show_home():
     """Render the Home Page."""
     st.title("Welcome to **ProdRec**")
@@ -197,95 +203,151 @@ def parse_categories(data):
     data['parsed_category'] = data['Category'].apply(lambda x: x.split('|')[0] if isinstance(x, str) else 'Unknown')
     return data
 
+
+
+
+
+
+#<---------------MAIN-FEATURES----PROCEED/LOG MODIFICATIONS---->
+
+def clean_price(price_str):
+    """Function to clean non-numeric characters from price strings and handle empty values."""
+    if not price_str or price_str == '' or pd.isna(price_str):
+        return np.nan  # Return NaN for empty or invalid price strings
+    
+    # Ensure price_str is a string and remove non-numeric characters (except dot for decimal)
+    cleaned_price = re.sub(r'[^\d.]', '', str(price_str))
+    
+    try:
+        return float(cleaned_price)  # Attempt to convert cleaned price to float
+    except ValueError:
+        return np.nan  # Return NaN if conversion fails
+
+# Function to load product data from the 'aadv' folder
+def load_data_from_folder(folder_path="aadv"):
+    """Loads the product data from the 'aadv' folder and returns a DataFrame."""
+    all_data = []
+    for file in os.listdir(folder_path):
+        if file.endswith('.csv'):  # assuming the data files are CSVs
+            file_path = os.path.join(folder_path, file)
+            # Read each CSV file and append to the list
+            try:
+                data = pd.read_csv(file_path)
+                data['category'] = file.replace('.csv', '')  # Add category column based on filename
+                all_data.append(data)
+            except Exception as e:
+                st.warning(f"Error reading {file}: {e}")
+    
+    # Concatenate all CSV files into one DataFrame
+    if all_data:
+        full_data = pd.concat(all_data, ignore_index=True)
+        return full_data
+    else:
+        st.warning("No valid CSV files found in the folder.")
+        return pd.DataFrame()
+
+# Function to display the comparison page
+def clean_ratings(rating_str):
+    """Function to clean non-numeric characters from ratings and handle empty values."""
+    try:
+        return float(rating_str) if pd.notna(rating_str) else np.nan
+    except ValueError:
+        return np.nan  # Return NaN for invalid ratings
+
+# In the show_compare function, clean ratings
 def show_compare():
-    """Render the Product Comparison Page with Detailed Descriptions and Point System."""
-    st.title("🔍 Advanced Product Comparison")
+    """Render the Product Comparison Page with Visualizations"""
+    st.title("🔍 Product Comparison")
     st.markdown("Compare products based on **category**, **price**, **ratings**, and other features.")
 
-    # Load Dataset for General Comparison
-    DATA_FILE = "opd.csv"  # Use your actual file path
-    data = load_data(DATA_FILE)
+    # Load dataset with caching from the 'aadv' folder
+    folder_path = "aadv"  # Update this with the path of the 'aadv' folder where your CSV files are
+    data = load_data_from_folder(folder_path)
 
-    # Category Selection for General Product Comparison
-    unique_categories = data['parsed_category'].dropna().unique()
-    selected_category = st.selectbox("Select a Category", unique_categories)
+    if data.empty:
+        st.error("No product data available for comparison.")
+        return
 
-    # Filter Data based on Selected Category
-    filtered_data = data[data['parsed_category'] == selected_category]
+    # Clean the price columns by removing non-numeric characters
+    data['discount_price'] = data['discount_price'].apply(lambda x: clean_price(str(x)))
+    data['actual_price'] = data['actual_price'].apply(lambda x: clean_price(str(x)))
 
-    # Product Selection
+    # Clean the ratings column
+    data['ratings'] = data['ratings'].apply(lambda x: clean_ratings(x))
+
+    # Ensure that discount_price and actual_price columns are numeric
+    data['discount_price'] = pd.to_numeric(data['discount_price'], errors='coerce')
+    data['actual_price'] = pd.to_numeric(data['actual_price'], errors='coerce')
+
+    # Reduce initial dataset size (Show only top categories and products)
+    unique_categories = data['category'].dropna().unique()
+    selected_category = st.selectbox("Select a Category", unique_categories[:10])  # Display first 10 categories
+
+    # Filter data based on selected category
+    filtered_data = data[data['category'] == selected_category]
+
+    # Product selection
     st.subheader("Select Products to Compare")
-    product_options = filtered_data['Name'].unique()  # Use 'Name' for product names
+    product_options = filtered_data['name'].unique()  # Use 'name' for product names
     selected_products = st.multiselect("Choose Products:", product_options, default=product_options[:2])
 
     if len(selected_products) >= 2:
-        comparison_data = filtered_data[filtered_data['Name'].isin(selected_products)]
+        comparison_data = filtered_data[filtered_data['name'].isin(selected_products)]
 
-        # Detailed Description and Image for each product
-        for product in selected_products:
-            st.subheader(f"Product Description: {product}")
-            product_data = comparison_data[comparison_data['Name'] == product].iloc[0]
-            
-            # Display product image from 'Media' column (not 'Image')
-            image_url = product_data['Media']
-            st.image(image_url, caption=f"{product} Image", use_column_width=True)
-
-            # Product Description
-            st.markdown(f"**Category**: {product_data['parsed_category']}")
-            st.markdown(f"**Discounted Price**: ₹{product_data['discounted_price']:.2f}")
-            st.markdown(f"**Actual Price**: ₹{product_data['actual_price']:.2f}")
-            st.markdown(f"**Rating**: {product_data['rating']}/5")
-            st.markdown(f"**Rating Count**: {product_data['rating_count']}")
-
-            # Show top reviews (you can customize this section as needed)
-            st.markdown(f"### Reviews for {product}")
-            st.markdown("#### Top Reviews:")
-            reviews = product_data['Reviews'].split(",")  # Assuming reviews are comma-separated
-            st.markdown(f"1. **{reviews[0]}**")
-            st.markdown(f"2. **{reviews[1]}**")
-
-            st.markdown("---")
-
-        # Visualizations (Radar chart, Heatmap, etc.)
-        st.subheader("Product Features Comparison (Radar Chart)")
-        radar_data = comparison_data[['Name', 'discounted_price', 'rating', 'rating_count']].set_index('Name')
-        radar_data = radar_data.T  # Transpose for radar plotting
-        radar_fig = go.Figure()
-        for product in radar_data.columns:
-            radar_fig.add_trace(go.Scatterpolar(
-                r=radar_data[product],
-                theta=radar_data.index,
-                fill='toself',
-                name=product
-            ))
-        radar_fig.update_layout(
-            polar=dict(radialaxis=dict(visible=True)),
-            showlegend=True,
-            title="Product Features Comparison"
-        )
-        st.plotly_chart(radar_fig)
-
-        # Heatmap of Correlations
-        st.subheader("Correlation Heatmap")
-        corr_matrix = comparison_data[['discounted_price', 'actual_price', 'rating', 'rating_count']].corr()
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt='.2f', ax=ax)
-        st.pyplot(fig)
-
-        # Assign Points Based on Features (Example: Higher rating gets more points)
+        # Point-Based Comparison Table
         st.subheader("Point-Based Comparison Table")
-        points_data = comparison_data[['Name', 'rating', 'discounted_price', 'rating_count']].copy()
-        points_data['rating_points'] = points_data['rating'] * 10  # Example scoring logic: 10 points per rating point
-        points_data['price_points'] = points_data['discounted_price'].apply(lambda x: 1000 - x)  # Example: cheaper products get more points
-        points_data['total_points'] = points_data['rating_points'] + points_data['price_points']
-        points_data = points_data[['Name', 'rating_points', 'price_points', 'total_points']]
+        
+        # Compute price points (cheaper products get more points)
+        min_price = comparison_data['discount_price'].min()
+        comparison_data['price_points'] = comparison_data['discount_price'].apply(lambda x: (1 / (x - min_price + 1)) * 100 if pd.notna(x) else 0)
 
+        # Compute rating points (higher ratings get more points)
+        max_rating = comparison_data['ratings'].max() if not comparison_data['ratings'].isnull().all() else 1  # Avoid division by zero
+        comparison_data['rating_points'] = comparison_data['ratings'].apply(lambda x: (x / max_rating) * 100 if pd.notna(x) else 0)
+
+        # Compute total points
+        comparison_data['total_points'] = comparison_data['price_points'] + comparison_data['rating_points']
+
+        # Display the points data
+        points_data = comparison_data[['name', 'price_points', 'rating_points', 'total_points']]
         st.dataframe(points_data)
 
         # Recommendation: Product with the highest points
         best_product = points_data.loc[points_data['total_points'].idxmax()]
         st.subheader("Recommended Product")
-        st.markdown(f"The product with the most points is **{best_product['Name']}** with **{best_product['total_points']} points**!")
+        st.markdown(f"The product with the most points is **{best_product['name']}** with **{best_product['total_points']} points**!")
+
+        # Improved Visualizations
+
+        # 1. Bar Chart for Price and Rating Comparison
+        st.subheader("Price vs Ratings Comparison")
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.bar(comparison_data['name'], comparison_data['discount_price'], alpha=0.7, label='Discount Price', color='blue')
+        ax.bar(comparison_data['name'], comparison_data['ratings'] * 10, alpha=0.7, label='Ratings x10', color='orange')
+        ax.set_xlabel('Product')
+        ax.set_ylabel('Value')
+        ax.set_title('Price vs Ratings for Selected Products')
+        ax.legend()
+        st.pyplot(fig)
+
+        # 2. Scatter Plot for Price vs Rating
+        st.subheader("Scatter Plot of Price vs Rating")
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.scatter(comparison_data['discount_price'], comparison_data['ratings'], color='green', s=100)
+        ax.set_xlabel('Discount Price')
+        ax.set_ylabel('Ratings')
+        ax.set_title('Price vs Rating Scatter Plot')
+        st.pyplot(fig)
+
+        # 3. Radar Chart for Product Comparison
+        st.subheader("Radar Chart: Price vs Ratings")
+        categories = ['Discount Price', 'Ratings']
+        values = [comparison_data['discount_price'].mean(), comparison_data['ratings'].mean()]
+        fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+        ax.plot(categories, values, linewidth=2, linestyle='solid')
+        ax.fill(categories, values, alpha=0.25)
+        ax.set_title('Radar Chart of Price and Rating Comparison')
+        st.pyplot(fig)
 
     else:
         st.warning("Please select at least 2 products for comparison.")
@@ -297,45 +359,15 @@ def show_compare():
 
 
 
+#<------------LOG MODIFICATIONS IN GITHUB--------->
+
 
 
     
 # Load the phone data
 phone_data = pd.read_csv('prp.csv')
 
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-# Load the phone data
-phone_data = pd.read_csv('prp.csv')
-
-import plotly.express as px
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
-import streamlit as st
-
-import plotly.express as px
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
-import streamlit as st
-
-import plotly.express as px
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
-import streamlit as st
-
-import pandas as pd
-import plotly.express as px
-import matplotlib.pyplot as plt
-import seaborn as sns
-import streamlit as st
 
 def show_phone_comparison():
     """Render Phone Comparison Section with Advanced and Aesthetically Pleasing Visuals."""
