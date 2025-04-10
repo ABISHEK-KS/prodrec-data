@@ -4,718 +4,512 @@ import plotly.express as px
 import plotly.graph_objects as go
 import seaborn as sns
 import matplotlib.pyplot as plt
-import numpy as np
+from mpl_toolkits.mplot3d import Axes3D
 import os
 import re
-from streamlit.components.v1 import html
-from functools import reduce
+import numpy as np
 
 # Configurations
-st.set_page_config(
-    page_title="ProdRec - Smart Product Comparison",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="ProdRec - Product Comparison Platform", page_icon="🛍️", layout="wide")
 
-# Custom CSS and JavaScript
-def inject_custom_style():
-    st.markdown("""
-    <style>
-        /* Base styling */
-        html, body, [class*="css"] {
-            font-family: 'Segoe UI', sans-serif;
-        }
-        .main {
-            background-color: #ffffff;
-        }
-        .stApp {
-            background-color: #f5f5f5;
-        }
-        h1, h2, h3, h4, h5, h6 {
-            color: #222222;
-            font-weight: 600;
-        }
-        .stButton>button {
-            background-color: #222222;
-            color: white;
-            border-radius: 8px;
-            border: none;
-            padding: 10px 24px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-        .stButton>button:hover {
-            background-color: #444444;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        .stSelectbox, .stMultiselect {
-            border-radius: 8px;
-        }
-        
-        /* Card styling */
-        .card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            padding: 24px;
-            margin-bottom: 24px;
-            border: 1px solid #e0e0e0;
-            transition: all 0.3s ease;
-        }
-        .card:hover {
-            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-            transform: translateY(-2px);
-        }
-        
-        /* Comparison step cards */
-        .step-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            padding: 24px;
-            margin-bottom: 16px;
-            border-left: 4px solid #222222;
-        }
-        
-        /* Graph containers */
-        .graph-container {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            border: 1px solid #e0e0e0;
-        }
-        
-        /* Animations */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade {
-            animation: fadeIn 0.6s ease-out forwards;
-        }
-        
-        /* Sidebar */
-        .sidebar .sidebar-content {
-            background-color: #222222;
-            color: white;
-        }
-        .sidebar .sidebar-content .stSelectbox, 
-        .sidebar .sidebar-content .stMultiselect {
-            background-color: white;
-            color: #222222;
-        }
-        
-        /* Footer */
-        .footer {
-            text-align: center;
-            padding: 20px;
-            margin-top: 40px;
-            color: #666;
-            font-size: 14px;
-            border-top: 1px solid #e0e0e0;
-        }
-        
-        /* Progress bar */
-        .progress-container {
-            width: 100%;
-            background-color: #e0e0e0;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-        .progress-bar {
-            height: 8px;
-            background-color: #222222;
-            border-radius: 8px;
-            width: 0%;
-            transition: width 0.4s ease;
-        }
-    </style>
-    
-    <script>
-        // Animation on load
-        document.addEventListener('DOMContentLoaded', function() {
-            const elements = document.querySelectorAll('.card, .graph-container, .stButton');
-            elements.forEach((el, index) => {
-                setTimeout(() => {
-                    el.classList.add('animate-fade');
-                }, index * 100);
-            });
-            
-            // Smooth scrolling for comparison steps
-            document.querySelectorAll('.comparison-step').forEach(step => {
-                step.style.opacity = '0';
-                step.style.transform = 'translateY(20px)';
-                step.style.transition = 'all 0.6s ease-out';
-            });
-        });
-        
-        // Function to animate comparison steps
-        function animateComparisonStep(stepNumber) {
-            const step = document.querySelector(`.comparison-step-${stepNumber}`);
-            if (step) {
-                step.style.opacity = '1';
-                step.style.transform = 'translateY(0)';
-            }
-        }
-        
-        // Function to update progress bar
-        function updateProgressBar(percentage) {
-            const progressBar = document.querySelector('.progress-bar');
-            if (progressBar) {
-                progressBar.style.width = `${percentage}%`;
-            }
-        }
-    </script>
-    """, unsafe_allow_html=True)
+# Load and Apply External CSS (if exists)
+def load_css():
+    """Reads external CSS and applies it."""
+    try:
+        with open("externalcss.css", "r") as f:
+            css = f.read()
+            st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning("CSS file 'externalcss.css' not found. Make sure it is in the correct directory.")
 
-# Data loading functions
+# Helper Functions
 @st.cache_data
-def load_product_data(folder_path="aadv"):
-    """Load product data from CSV files in the specified folder."""
+def load_data(file_path):
+    """Load dataset from a local CSV file and return a copy to avoid mutation."""
+    data = pd.read_csv(file_path)
+    
+    # Check if 'category' column exists
+    if 'category' not in data.columns:
+        raise ValueError("'category' column not found in the dataset.")
+    
+    # Parse categories
+    data = parse_categories(data)
+    
+    return data
+
+def parse_categories(data):
+    """Parse categories with synonyms separated by '|'."""
+    data['parsed_category'] = data['category'].apply(lambda x: x.split('|')[0] if isinstance(x, str) else 'Unknown')
+    return data
+
+def show_home():
+    """Render the Home Page."""
+    st.title("Welcome to **ProdRec**")
+    st.subheader("Your Trusted Companion in Smarter Shopping Decisions")
+    st.markdown("""At **ProdRec**, we simplify your shopping journey by helping you:
+    - Discover products tailored to your needs and budget.
+    - Compare features, prices, and ratings side-by-side.
+    - Decide with confidence, backed by clear, transparent insights.
+
+    Let’s make your shopping experience smarter, easier, and more rewarding.""")
+    st.image(
+        "https://via.placeholder.com/1200x500.png?text=Your+Product+Comparison+Starts+Here!",
+        use_column_width=True,
+        caption="Explore. Compare. Decide."
+    )
+    st.markdown("---")
+    st.markdown("### Ready to explore?")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Explore Products"):
+            st.success("Switch to 'Compare Products' using the sidebar.")
+    with col2:
+        if st.button("Learn More"):
+            st.info("ProdRec makes smarter shopping possible.")
+    st.markdown("---")
+    st.markdown("© 2024 ProdRec Inc. | Built with ❤️ using Streamlit")
+
+import pandas as pd
+import streamlit as st
+import plotly.express as px
+import plotly.graph_objects as go
+
+@st.cache_data
+def load_data(file_path):
+    """Load dataset from a local CSV file and return a copy to avoid mutation."""
+    data = pd.read_csv(file_path)
+    
+    # Check if 'Category' column exists (case-sensitive check)
+    if 'Category' not in data.columns:
+        raise ValueError("'Category' column not found in the dataset.")
+    
+    # Parse categories (handle cases where data might have multiple categories or issues)
+    data = parse_categories(data)
+    
+    # Clean other columns such as price, ratings
+    data['discounted_price'] = pd.to_numeric(data['Price now'], errors='coerce')
+    data['actual_price'] = pd.to_numeric(data['Earlier Price'], errors='coerce')
+    data['rating'] = pd.to_numeric(data['Rating'], errors='coerce')
+    data['rating_count'] = pd.to_numeric(data['Rating Count'], errors='coerce')
+
+    return data
+
+def parse_categories(data):
+    """Parse categories with synonyms separated by '|'."""
+    data['parsed_category'] = data['Category'].apply(lambda x: x.split('|')[0] if isinstance(x, str) else 'Unknown')
+    return data
+
+
+
+def show_home():
+    """Render the Home Page."""
+    st.title("Welcome to **ProdRec**")
+    st.subheader("Your Trusted Companion in Smarter Shopping Decisions")
+    st.markdown("""At **ProdRec**, we simplify your shopping journey by helping you:
+    - Discover products tailored to your needs and budget.
+    - Compare features, prices, and ratings side-by-side.
+    - Decide with confidence, backed by clear, transparent insights.
+
+    Let’s make your shopping experience smarter, easier, and more rewarding.""")
+    st.image(
+        "https://via.placeholder.com/1200x500.png?text=Your+Product+Comparison+Starts+Here!",
+        use_column_width=True,
+        caption="Explore. Compare. Decide."
+    )
+    st.markdown("---")
+    st.markdown("### Ready to explore?")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Explore Products"):
+            st.success("Switch to 'Compare Products' using the sidebar.")
+    with col2:
+        if st.button("Learn More"):
+            st.info("ProdRec makes smarter shopping possible.")
+    st.markdown("---")
+    st.markdown("© 2024 ProdRec Inc. | Built with ❤️ using Streamlit")
+
+@st.cache_data
+def load_data(file_path):
+    """Load dataset from a local CSV file and return a copy to avoid mutation."""
+    data = pd.read_csv(file_path)
+    
+    # Check if 'Category' column exists (case-sensitive check)
+    if 'Category' not in data.columns:
+        raise ValueError("'Category' column not found in the dataset.")
+    
+    # Parse categories (handle cases where data might have multiple categories or issues)
+    data = parse_categories(data)
+    
+    # Clean other columns such as price, ratings
+    data['discounted_price'] = pd.to_numeric(data['Price now'], errors='coerce')
+    data['actual_price'] = pd.to_numeric(data['Earlier Price'], errors='coerce')
+    data['rating'] = pd.to_numeric(data['Rating'], errors='coerce')
+    data['rating_count'] = pd.to_numeric(data['Rating Count'], errors='coerce')
+
+    return data
+
+def parse_categories(data):
+    """Parse categories if they contain multiple values separated by '|'. For now, we take the first category."""
+    data['parsed_category'] = data['Category'].apply(lambda x: x.split('|')[0] if isinstance(x, str) else 'Unknown')
+    return data
+
+@st.cache_data
+def load_data(file_path):
+    """Load dataset from a local CSV file and return a copy to avoid mutation."""
+    data = pd.read_csv(file_path)
+    
+    # Check if 'Category' column exists (case-sensitive check)
+    if 'Category' not in data.columns:
+        raise ValueError("'Category' column not found in the dataset.")
+    
+    # Parse categories (handle cases where data might have multiple categories or issues)
+    data = parse_categories(data)
+    
+    # Clean other columns such as price, ratings
+    data['discounted_price'] = pd.to_numeric(data['Price now'], errors='coerce')
+    data['actual_price'] = pd.to_numeric(data['Earlier Price'], errors='coerce')
+    data['rating'] = pd.to_numeric(data['Rating'], errors='coerce')
+    data['rating_count'] = pd.to_numeric(data['Rating Count'], errors='coerce')
+
+    return data
+
+def parse_categories(data):
+    """Parse categories if they contain multiple values separated by '|'. For now, we take the first category."""
+    data['parsed_category'] = data['Category'].apply(lambda x: x.split('|')[0] if isinstance(x, str) else 'Unknown')
+    return data
+
+@st.cache_data
+def load_data(file_path):
+    """Load dataset from a local CSV file and return a copy to avoid mutation."""
+    data = pd.read_csv(file_path)
+    
+    # Check if 'Category' column exists (case-sensitive check)
+    if 'Category' not in data.columns:
+        raise ValueError("'Category' column not found in the dataset.")
+    
+    # Parse categories (handle cases where data might have multiple categories or issues)
+    data = parse_categories(data)
+    
+    # Clean other columns such as price, ratings
+    data['discounted_price'] = pd.to_numeric(data['Price now'], errors='coerce')
+    data['actual_price'] = pd.to_numeric(data['Earlier Price'], errors='coerce')
+    data['rating'] = pd.to_numeric(data['Rating'], errors='coerce')
+    data['rating_count'] = pd.to_numeric(data['Rating Count'], errors='coerce')
+
+    return data
+
+def parse_categories(data):
+    """Parse categories if they contain multiple values separated by '|'. For now, we take the first category."""
+    data['parsed_category'] = data['Category'].apply(lambda x: x.split('|')[0] if isinstance(x, str) else 'Unknown')
+    return data
+
+
+
+
+
+
+#<---------------MAIN-FEATURES----PROCEED/LOG MODIFICATIONS---->
+
+def clean_price(price_str):
+    """Function to clean non-numeric characters from price strings and handle empty values."""
+    if not price_str or price_str == '' or pd.isna(price_str):
+        return np.nan  # Return NaN for empty or invalid price strings
+    
+    # Ensure price_str is a string and remove non-numeric characters (except dot for decimal)
+    cleaned_price = re.sub(r'[^\d.]', '', str(price_str))
+    
+    try:
+        return float(cleaned_price)  # Attempt to convert cleaned price to float
+    except ValueError:
+        return np.nan  # Return NaN if conversion fails
+
+# Function to load product data from the 'aadv' folder
+def load_data_from_folder(folder_path="aadv"):
+    """Loads the product data from the 'aadv' folder and returns a DataFrame."""
     all_data = []
     for file in os.listdir(folder_path):
-        if file.endswith('.csv'):
+        if file.endswith('.csv'):  # assuming the data files are CSVs
             file_path = os.path.join(folder_path, file)
+            # Read each CSV file and append to the list
             try:
                 data = pd.read_csv(file_path)
-                data['category'] = file.replace('.csv', '')
+                data['category'] = file.replace('.csv', '')  # Add category column based on filename
                 all_data.append(data)
             except Exception as e:
                 st.warning(f"Error reading {file}: {e}")
     
+    # Concatenate all CSV files into one DataFrame
     if all_data:
-        return pd.concat(all_data, ignore_index=True)
-    return pd.DataFrame()
+        full_data = pd.concat(all_data, ignore_index=True)
+        return full_data
+    else:
+        st.warning("No valid CSV files found in the folder.")
+        return pd.DataFrame()
 
-@st.cache_data
-def load_phone_data():
-    """Load phone data from CSV file."""
-    return pd.read_csv('prp.csv')
-
-def clean_price(price_str):
-    """Clean and convert price strings to numeric values."""
-    if pd.isna(price_str) or price_str == '':
-        return np.nan
-    cleaned = re.sub(r'[^\d.]', '', str(price_str))
-    try:
-        return float(cleaned)
-    except ValueError:
-        return np.nan
-
+# Function to display the comparison page
 def clean_ratings(rating_str):
-    """Clean and convert rating strings to numeric values."""
+    """Function to clean non-numeric characters from ratings and handle empty values."""
     try:
         return float(rating_str) if pd.notna(rating_str) else np.nan
     except ValueError:
-        return np.nan
+        return np.nan  # Return NaN for invalid ratings
 
-# Home Page
-def show_home():
-    """Display the home page."""
-    st.title("🛍️ Welcome to ProdRec")
-    st.markdown("### Your Smart Product Comparison Platform")
-    
-    with st.container():
-        st.markdown("""
-        <div class='card'>
-            <h3 style='color: #222222;'>ProdRec helps you make informed purchasing decisions by:</h3>
-            <ul>
-                <li>Providing detailed product comparisons</li>
-                <li>Visualizing key metrics and features</li>
-                <li>Recommending the best options based on your priorities</li>
-            </ul>
-            <p>Get started by selecting a comparison tool from the sidebar.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.image(
-        "https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
-        use_column_width=True,
-        caption="Compare. Analyze. Decide."
-    )
-    
-    st.markdown("---")
-    st.markdown("""
-    <div class='footer'>
-        © 2024 ProdRec | Data-Driven Shopping Decisions
-    </div>
-    """, unsafe_allow_html=True)
+# In the show_compare function, clean ratings
+def show_compare():
+    """Render the Product Comparison Page with Visualizations"""
+    st.title("🔍 Product Comparison")
+    st.markdown("Compare products based on **category**, **price**, **ratings**, and other features.")
 
-# Product Comparison Page
-def show_product_comparison():
-    """Display the product comparison page."""
-    st.title("📊 Product Comparison")
-    st.markdown("Compare products across categories and features.")
-    
-    # Load data
-    data = load_product_data()
+    # Load dataset with caching from the 'aadv' folder
+    folder_path = "aadv"  # Update this with the path of the 'aadv' folder where your CSV files are
+    data = load_data_from_folder(folder_path)
+
     if data.empty:
-        st.error("No product data available.")
+        st.error("No product data available for comparison.")
         return
-    
-    # Clean data
+
+    # Clean the price columns by removing non-numeric characters
     data['discount_price'] = data['discount_price'].apply(lambda x: clean_price(str(x)))
     data['actual_price'] = data['actual_price'].apply(lambda x: clean_price(str(x)))
-    data['ratings'] = data['ratings'].apply(clean_ratings)
-    
-    # Category selection
-    categories = data['category'].dropna().unique()
-    selected_category = st.selectbox("Select Category", categories[:10])
-    
-    # Filter data
+
+    # Clean the ratings column
+    data['ratings'] = data['ratings'].apply(lambda x: clean_ratings(x))
+
+    # Ensure that discount_price and actual_price columns are numeric
+    data['discount_price'] = pd.to_numeric(data['discount_price'], errors='coerce')
+    data['actual_price'] = pd.to_numeric(data['actual_price'], errors='coerce')
+
+    # Reduce initial dataset size (Show only top categories and products)
+    unique_categories = data['category'].dropna().unique()
+    selected_category = st.selectbox("Select a Category", unique_categories[:10])  # Display first 10 categories
+
+    # Filter data based on selected category
     filtered_data = data[data['category'] == selected_category]
-    product_options = filtered_data['name'].unique()
-    selected_products = st.multiselect("Select Products", product_options, default=product_options[:2])
-    
+
+    # Product selection
+    st.subheader("Select Products to Compare")
+    product_options = filtered_data['name'].unique()  # Use 'name' for product names
+    selected_products = st.multiselect("Choose Products:", product_options, default=product_options[:2])
+
     if len(selected_products) >= 2:
-        comparison_data = filtered_data[filtered_data['name'].isin(selected_products)].copy()
+        comparison_data = filtered_data[filtered_data['name'].isin(selected_products)]
+
+        # Point-Based Comparison Table
+        st.subheader("Point-Based Comparison Table")
         
-        # Calculate comparison metrics
-        comparison_data['price_points'] = 100 * (1 - (comparison_data['discount_price'] - comparison_data['discount_price'].min()) / 
-                                             (comparison_data['discount_price'].max() - comparison_data['discount_price'].min()))
-        comparison_data['rating_points'] = 100 * (comparison_data['ratings'] / comparison_data['ratings'].max())
+        # Compute price points (cheaper products get more points)
+        min_price = comparison_data['discount_price'].min()
+        comparison_data['price_points'] = comparison_data['discount_price'].apply(lambda x: (1 / (x - min_price + 1)) * 100 if pd.notna(x) else 0)
+
+        # Compute rating points (higher ratings get more points)
+        max_rating = comparison_data['ratings'].max() if not comparison_data['ratings'].isnull().all() else 1  # Avoid division by zero
+        comparison_data['rating_points'] = comparison_data['ratings'].apply(lambda x: (x / max_rating) * 100 if pd.notna(x) else 0)
+
+        # Compute total points
         comparison_data['total_points'] = comparison_data['price_points'] + comparison_data['rating_points']
-        
-        # Display comparison table
-        with st.container():
-            st.markdown("<div class='card'>", unsafe_allow_html=True)
-            st.subheader("Comparison Summary")
-            st.dataframe(
-                comparison_data[['name', 'discount_price', 'actual_price', 'ratings', 'total_points']]
-                .rename(columns={
-                    'name': 'Product',
-                    'discount_price': 'Price',
-                    'actual_price': 'Original Price',
-                    'ratings': 'Rating',
-                    'total_points': 'Score'
-                })
-                .style.format({
-                    'Price': '₹{:.2f}',
-                    'Original Price': '₹{:.2f}',
-                    'Rating': '{:.1f}',
-                    'Score': '{:.1f}'
-                })
-                .background_gradient(cmap='Greys')
-            )
-            st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Best product
-        best_product = comparison_data.loc[comparison_data['total_points'].idxmax()]
-        
-        # Step-by-step comparison
-        st.subheader("Step-by-Step Comparison")
-        st.markdown("""
-        <div class='progress-container'>
-            <div class='progress-bar' id='progress-bar'></div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        steps = [
-            ("Price Comparison", "discount_price", "Lower price is better", "₹{:.2f}", False),
-            ("Rating Comparison", "ratings", "Higher rating is better", "{:.1f}", True),
-            ("Value for Money", "total_points", "Higher score indicates better overall value", "{:.1f}", True)
-        ]
-        
-        for i, (title, col, desc, fmt, higher_better) in enumerate(steps, 1):
-            with st.container():
-                st.markdown(f"""
-                <div class='step-card comparison-step comparison-step-{i}'>
-                    <h3>{i}. {title}</h3>
-                    <p>{desc}</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Update progress bar
-                html(f"""
-                <script>
-                    updateProgressBar({i / len(steps) * 100});
-                    setTimeout(() => animateComparisonStep({i}), 200);
-                </script>
-                """)
-                
-                # Create figure
-                fig = go.Figure()
-                
-                for _, row in comparison_data.iterrows():
-                    value = row[col]
-                    formatted_value = fmt.format(value)
-                    color = '#222222' if row['name'] == best_product['name'] else '#888888'
-                    
-                    fig.add_trace(go.Bar(
-                        x=[row['name']],
-                        y=[value],
-                        name=row['name'],
-                        text=[formatted_value],
-                        textposition='auto',
-                        marker_color=color,
-                        hovertemplate=f"<b>{row['name']}</b><br>{title}: {formatted_value}<extra></extra>"
-                    ))
-                
-                fig.update_layout(
-                    showlegend=False,
-                    plot_bgcolor='white',
-                    paper_bgcolor='white',
-                    xaxis_title="Product",
-                    yaxis_title=title,
-                    margin=dict(l=20, r=20, t=30, b=20)
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-                
-                st.markdown("---")
-        
-        # Final recommendation
-        with st.container():
-            st.markdown("<div class='card'>", unsafe_allow_html=True)
-            st.subheader("🏆 Final Recommendation")
-            st.markdown(f"""
-            <div style='background: #f5f5f5; padding: 20px; border-radius: 8px;'>
-                <h3 style='color: #222222;'>{best_product['name']}</h3>
-                <p><strong>Score:</strong> {best_product['total_points']:.1f}/200</p>
-                <p><strong>Price:</strong> ₹{best_product['discount_price']:.2f}</p>
-                <p><strong>Rating:</strong> {best_product['ratings']:.1f}</p>
-                <p>This product offers the best balance of price and quality in your selection.</p>
-            </div>
-            """, unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Additional visualizations
-        with st.container():
-            st.markdown("<div class='graph-container'>", unsafe_allow_html=True)
-            st.subheader("Price vs Rating Analysis")
-            
-            fig = px.scatter(
-                comparison_data,
-                x='discount_price',
-                y='ratings',
-                size='total_points',
-                color='name',
-                color_discrete_sequence=['#222222', '#666666', '#999999'],
-                hover_name='name',
-                labels={
-                    'discount_price': 'Price (₹)',
-                    'ratings': 'Rating',
-                    'total_points': 'Overall Score'
-                }
-            )
-            
-            fig.update_layout(
-                plot_bgcolor='white',
-                paper_bgcolor='white',
-                xaxis=dict(showgrid=True, gridcolor='#e0e0e0'),
-                yaxis=dict(showgrid=True, gridcolor='#e0e0e0'),
-                legend_title_text='Product'
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-            st.markdown("""
-            <div style='padding: 15px; background: #f5f5f5; border-radius: 8px; margin-top: 15px;'>
-                <strong>Insight:</strong> This scatter plot shows the relationship between price and ratings. 
-                The ideal products are in the top-left quadrant (low price, high rating).
-            </div>
-            """, unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Radar chart
-        with st.container():
-            st.markdown("<div class='graph-container'>", unsafe_allow_html=True)
-            st.subheader("Feature Radar Chart")
-            
-            categories = ['Price', 'Rating', 'Value']
-            fig = go.Figure()
-            
-            for _, row in comparison_data.iterrows():
-                fig.add_trace(go.Scatterpolar(
-                    r=[
-                        1 - (row['discount_price'] - comparison_data['discount_price'].min()) / 
-                        (comparison_data['discount_price'].max() - comparison_data['discount_price'].min()),
-                        row['ratings'] / comparison_data['ratings'].max(),
-                        row['total_points'] / comparison_data['total_points'].max()
-                    ],
-                    theta=categories,
-                    fill='toself',
-                    name=row['name'],
-                    line_color='#222222' if row['name'] == best_product['name'] else '#888888'
-                ))
-            
-            fig.update_layout(
-                polar=dict(
-                    radialaxis=dict(visible=True, range=[0, 1]),
-                showlegend=True,
-                plot_bgcolor='white',
-                paper_bgcolor='white'
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-            st.markdown("""
-            <div style='padding: 15px; background: #f5f5f5; border-radius: 8px; margin-top: 15px;'>
-                <strong>Insight:</strong> The radar chart provides a quick visual comparison of key metrics. 
-                Larger area indicates better overall performance.
-            </div>
-            """, unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-    
+
+        # Display the points data
+        points_data = comparison_data[['name', 'price_points', 'rating_points', 'total_points']]
+        st.dataframe(points_data)
+
+        # Recommendation: Product with the highest points
+        best_product = points_data.loc[points_data['total_points'].idxmax()]
+        st.subheader("Recommended Product")
+        st.markdown(f"The product with the most points is **{best_product['name']}** with **{best_product['total_points']} points**!")
+
+        # Improved Visualizations
+
+        # 1. Bar Chart for Price and Rating Comparison
+        st.subheader("Price vs Ratings Comparison")
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.bar(comparison_data['name'], comparison_data['discount_price'], alpha=0.7, label='Discount Price', color='blue')
+        ax.bar(comparison_data['name'], comparison_data['ratings'] * 10, alpha=0.7, label='Ratings x10', color='orange')
+        ax.set_xlabel('Product')
+        ax.set_ylabel('Value')
+        ax.set_title('Price vs Ratings for Selected Products')
+        ax.legend()
+        st.pyplot(fig)
+
+        # 2. Scatter Plot for Price vs Rating
+        st.subheader("Scatter Plot of Price vs Rating")
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.scatter(comparison_data['discount_price'], comparison_data['ratings'], color='green', s=100)
+        ax.set_xlabel('Discount Price')
+        ax.set_ylabel('Ratings')
+        ax.set_title('Price vs Rating Scatter Plot')
+        st.pyplot(fig)
+
+        # 3. Radar Chart for Product Comparison
+        st.subheader("Radar Chart: Price vs Ratings")
+        categories = ['Discount Price', 'Ratings']
+        values = [comparison_data['discount_price'].mean(), comparison_data['ratings'].mean()]
+        fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+        ax.plot(categories, values, linewidth=2, linestyle='solid')
+        ax.fill(categories, values, alpha=0.25)
+        ax.set_title('Radar Chart of Price and Rating Comparison')
+        st.pyplot(fig)
+
     else:
         st.warning("Please select at least 2 products for comparison.")
-    
-    st.markdown("---")
-    st.markdown("""
-    <div class='footer'>
-        © 2024 ProdRec | Data-Driven Shopping Decisions
-    </div>
-    """, unsafe_allow_html=True)
 
-# Phone Comparison Page
+    st.markdown("---")
+    st.markdown("© 2024 ProdRec Inc. | Built with ❤️ using Streamlit")
+
+
+
+
+
+#<------------LOG MODIFICATIONS IN GITHUB--------->
+
+
+
+    
+# Load the phone data
+phone_data = pd.read_csv('prp.csv')
+
+
+
 def show_phone_comparison():
-    """Display the phone comparison page."""
-    st.title("📱 Smartphone Comparison")
-    st.markdown("Compare smartphones based on specifications and features.")
-    
-    # Load data
-    phone_data = load_phone_data()
-    
-    # Brand selection
+    """Render Phone Comparison Section with Advanced and Aesthetically Pleasing Visuals."""
+    st.title("📱 Compare Phones")
+
+    # Step 1: Select Phones for Comparison (Multiple Brands)
     brands = phone_data['Brand'].unique()
-    selected_brands = st.multiselect("Select Brands", brands, default=brands[:1])
-    
-    # Model selection
-    selected_models = []
+    selected_brands = st.multiselect("Select Brands", brands, default=brands[:1], key="brand_selector")
+
+    # Prepare list to store selected phones
+    selected_phones = []
+
     for brand in selected_brands:
-        brand_models = phone_data[phone_data['Brand'] == brand]['Model'].unique()
-        selected_model = st.selectbox(f"Select {brand} Model", brand_models)
-        selected_models.append(selected_model)
-    
-    if len(selected_models) >= 2:
-        # Filter data
-        comparison_data = phone_data[phone_data['Model'].isin(selected_models)].copy()
-        
-        # Clean and convert data
+        brand_data = phone_data[phone_data['Brand'] == brand]
+        models = brand_data['Model'].unique()
+        selected_model = st.selectbox(f"Select Phone from {brand}", models, key=f"model_selector_{brand}")
+        selected_phones.append(selected_model)
+
+    if len(selected_phones) >= 2:
+        # Filter the data for selected models
+        comparison_data = phone_data[phone_data['Model'].isin(selected_phones)]
+
+        # Convert 'Memory' and 'Storage' to numeric (removing 'GB' and converting to integer)
         comparison_data['Memory'] = comparison_data['Memory'].str.replace('GB', '').astype(int)
         comparison_data['Storage'] = comparison_data['Storage'].str.replace('GB', '').astype(int)
-        
-        # Calculate scores
-        comparison_data['Performance Score'] = (
-            comparison_data['Memory'] * 0.4 + 
-            comparison_data['Storage'] * 0.3 +
-            comparison_data['Rating'] * 20
-        )
-        
-        comparison_data['Value Score'] = (
-            (100000 / comparison_data['Selling Price']) * 0.6 +
-            comparison_data['Rating'] * 0.4
-        )
-        
-        comparison_data['Total Score'] = (
-            comparison_data['Performance Score'] * 0.6 +
-            comparison_data['Value Score'] * 0.4
-        )
-        
-        # Best phone
-        best_phone = comparison_data.loc[comparison_data['Total Score'].idxmax()]
-        
+
+        # Assign points for each feature (optional, based on your logic)
+        def assign_points(phone):
+            points = 0
+            points += phone['Memory']  # Points for Memory (1 point per GB of RAM)
+            points += phone['Storage'] / 64  # Points for Storage (1 point per 64 GB of Storage)
+            points += phone['Rating'] * 2  # Points for Rating (Maximum 10 points for a 5-star rating)
+            points += 100000 / phone['Selling Price']  # Inverse scoring: lower price gets more points
+            return points
+
+        # Calculate points for each phone
+        comparison_data['Points'] = comparison_data.apply(assign_points, axis=1)
+
         # Display comparison table
-        with st.container():
-            st.markdown("<div class='card'>", unsafe_allow_html=True)
-            st.subheader("Specification Comparison")
-            
-            display_cols = [
-                'Brand', 'Model', 'Memory', 'Storage', 'Rating', 
-                'Selling Price', 'Original Price', 'Total Score'
-            ]
-            
-            st.dataframe(
-                comparison_data[display_cols]
-                .rename(columns={
-                    'Memory': 'RAM (GB)',
-                    'Storage': 'Storage (GB)',
-                    'Rating': 'Rating (5)',
-                    'Selling Price': 'Price (₹)',
-                    'Original Price': 'Original (₹)',
-                    'Total Score': 'Score'
-                })
-                .style.format({
-                    'Price (₹)': '₹{:.2f}',
-                    'Original (₹)': '₹{:.2f}',
-                    'Score': '{:.1f}',
-                    'Rating (5)': '{:.1f}'
-                })
-                .background_gradient(cmap='Greys')
-            )
-            st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Step-by-step comparison
-        st.subheader("Feature Breakdown")
-        
-        features = [
-            ("Performance", "Performance Score", ["RAM (GB)", "Storage (GB)", "Rating"], "Higher is better", "{:.1f}", True),
-            ("Value for Money", "Value Score", ["Price (₹)", "Rating"], "Lower price with good rating is best", "{:.1f}", True),
-            ("Overall Recommendation", "Total Score", ["Performance Score", "Value Score"], "Balanced performance and value", "{:.1f}", True)
-        ]
-        
-        for i, (title, col, components, desc, fmt, higher_better) in enumerate(features, 1):
-            with st.container():
-                st.markdown(f"""
-                <div class='step-card comparison-step comparison-step-{i}'>
-                    <h3>{i}. {title}</h3>
-                    <p>{desc}</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Update progress bar
-                html(f"""
-                <script>
-                    updateProgressBar({i / len(features) * 100});
-                    setTimeout(() => animateComparisonStep({i}), 200);
-                </script>
-                """)
-                
-                # Create figure
-                fig = go.Figure()
-                
-                for _, row in comparison_data.iterrows():
-                    value = row[col]
-                    formatted_value = fmt.format(value)
-                    color = '#222222' if row['Model'] == best_phone['Model'] else '#888888'
-                    
-                    fig.add_trace(go.Bar(
-                        x=[row['Model']],
-                        y=[value],
-                        name=row['Model'],
-                        text=[formatted_value],
-                        textposition='auto',
-                        marker_color=color,
-                        hovertemplate=f"<b>{row['Model']}</b><br>{title}: {formatted_value}<extra></extra>"
-                    ))
-                
-                fig.update_layout(
-                    showlegend=False,
-                    plot_bgcolor='white',
-                    paper_bgcolor='white',
-                    xaxis_title="Model",
-                    yaxis_title=title,
-                    margin=dict(l=20, r=20, t=30, b=20)
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Show component breakdown
-                with st.expander(f"See {title} components"):
-                    component_fig = go.Figure()
-                    
-                    for component in components:
-                        for _, row in comparison_data.iterrows():
-                            component_fig.add_trace(go.Bar(
-                                x=[row['Model']],
-                                y=[row[component.replace(' (₹)', '').replace(' (GB)', '').replace(' (5)', '')]],
-                                name=component,
-                                textposition='auto',
-                                marker_color='#222222',
-                                hovertemplate=f"<b>{row['Model']}</b><br>{component}: {row[component.replace(' (₹)', '').replace(' (GB)', '').replace(' (5)', '')]}<extra></extra>"
-                            ))
-                    
-                    component_fig.update_layout(
-                        barmode='group',
-                        plot_bgcolor='white',
-                        paper_bgcolor='white',
-                        xaxis_title="Model",
-                        yaxis_title="Value",
-                        margin=dict(l=20, r=20, t=30, b=20)
-                    )
-                    
-                    st.plotly_chart(component_fig, use_container_width=True)
-                
-                st.markdown("---")
-        
-        # Final recommendation
-        with st.container():
-            st.markdown("<div class='card'>", unsafe_allow_html=True)
-            st.subheader("🏆 Best Overall Phone")
-            st.markdown(f"""
-            <div style='background: #f5f5f5; padding: 20px; border-radius: 8px;'>
-                <h3 style='color: #222222;'>{best_phone['Brand']} {best_phone['Model']}</h3>
-                <p><strong>Total Score:</strong> {best_phone['Total Score']:.1f}</p>
-                <p><strong>RAM:</strong> {best_phone['Memory']}GB</p>
-                <p><strong>Storage:</strong> {best_phone['Storage']}GB</p>
-                <p><strong>Price:</strong> ₹{best_phone['Selling Price']:.2f}</p>
-                <p><strong>Rating:</strong> {best_phone['Rating']:.1f}/5</p>
-                <p>This phone offers the best combination of performance and value in your selection.</p>
-            </div>
-            """, unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Parallel coordinates plot
-        with st.container():
-            st.markdown("<div class='graph-container'>", unsafe_allow_html=True)
-            st.subheader("Feature Comparison")
-            
-            dimensions = [
-                dict(range=[comparison_data['Memory'].min(), comparison_data['Memory'].max()], 
-                     label='RAM (GB)', values=comparison_data['Memory']),
-                dict(range=[comparison_data['Storage'].min(), comparison_data['Storage'].max()], 
-                     label='Storage (GB)', values=comparison_data['Storage']),
-                dict(range=[comparison_data['Rating'].min(), comparison_data['Rating'].max()], 
-                     label='Rating', values=comparison_data['Rating']),
-                dict(range=[comparison_data['Selling Price'].min(), comparison_data['Selling Price'].max()], 
-                     label='Price (₹)', values=comparison_data['Selling Price']),
-                dict(range=[comparison_data['Total Score'].min(), comparison_data['Total Score'].max()], 
-                     label='Total Score', values=comparison_data['Total Score'])
-            ]
-            
-            fig = go.Figure(go.Parcoords(
-                line=dict(
-                    color=comparison_data['Total Score'],
-                    colorscale='Greys',
-                    showscale=True,
-                    reversescale=True
-                ),
-                dimensions=dimensions
-            ))
-            
-            fig.update_layout(
-                plot_bgcolor='white',
-                paper_bgcolor='white',
-                margin=dict(l=60, r=60, t=40, b=40)
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-            st.markdown("""
-            <div style='padding: 15px; background: #f5f5f5; border-radius: 8px; margin-top: 15px;'>
-                <strong>Insight:</strong> This parallel coordinates plot shows how each phone compares across multiple dimensions. 
-                Follow the lines to see each phone's strengths and weaknesses.
-            </div>
-            """, unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-    
-    else:
-        st.warning("Please select at least 2 phones for comparison.")
-    
-    st.markdown("---")
-    st.markdown("""
-    <div class='footer'>
-        © 2024 ProdRec | Data-Driven Shopping Decisions
-    </div>
-    """, unsafe_allow_html=True)
+        st.subheader("Phone Comparison Table")
+        table_data = comparison_data[['Brand', 'Model', 'Color', 'Memory', 'Storage', 'Rating', 'Selling Price', 'Original Price', 'Points']]
+        table_data = table_data.rename(columns={
+            'Brand': 'Brand',
+            'Model': 'Model',
+            'Color': 'Color',
+            'Memory': 'Memory (GB)',
+            'Storage': 'Storage (GB)',
+            'Rating': 'Rating',
+            'Selling Price': 'Selling Price (₹)',
+            'Original Price': 'Original Price (₹)',
+            'Points': 'Points'
+        })
+        st.dataframe(table_data)
 
-# Main App
-def main():
-    inject_custom_style()
-    
-    # Sidebar navigation
-    st.sidebar.title("ProdRec")
-    st.sidebar.markdown("### Navigation")
-    page = st.sidebar.radio("", ["Home", "Product Comparison", "Phone Comparison"])
-    
-    # Page routing
-    if page == "Home":
-        show_home()
-    elif page == "Product Comparison":
-        show_product_comparison()
-    elif page == "Phone Comparison":
-        show_phone_comparison()
+        # **Phone Recommendation: Best Overall Score**
+        best_phone = comparison_data.loc[comparison_data['Points'].idxmax()]
+        st.markdown("### 📱 **Recommended Phone with the Best Features**")
+        st.write(f"The phone with the **best features** is **{best_phone['Model']}** by {best_phone['Brand']}.")
+        st.write(f"**Total Points**: {best_phone['Points']}")
+        st.write(f"**Selling Price**: ₹{best_phone['Selling Price']}")
+        st.write(f"**Rating**: {best_phone['Rating']} stars")
+        st.write(f"**Best Buy**: This phone offers the most balanced combination of **features, performance**, and **price**!")
 
-if __name__ == "__main__":
-    main()
+        # Visualizations
+
+        # **Visual 1: Violin Plot of Rating Distribution by Model**
+        st.subheader("Rating Distribution by Model (Violin Plot)")
+        fig = px.violin(comparison_data, y='Rating', x='Model', color='Model', box=True, points="all", title="Rating Distribution by Model")
+        st.plotly_chart(fig)
+
+        # **Visual 2: Violin Plot of Selling Price Distribution by Model**
+        st.subheader("Selling Price Distribution by Model (Violin Plot)")
+        fig = px.violin(comparison_data, y='Selling Price', x='Model', color='Model', box=True, points="all", title="Selling Price Distribution by Model")
+        st.plotly_chart(fig)
+
+        # **Visual 3: Violin Plot of Memory (RAM) Distribution by Model**
+        st.subheader("Memory (RAM) Distribution by Model (Violin Plot)")
+        fig = px.violin(comparison_data, y='Memory', x='Model', color='Model', box=True, points="all", title="Memory (RAM) Distribution by Model")
+        st.plotly_chart(fig)
+
+        # **Visual 4: Parallel Coordinates Plot (for feature comparison)**
+        st.subheader("Parallel Coordinates Plot")
+        fig = px.parallel_coordinates(
+            comparison_data, color="Points", dimensions=["Memory", "Storage", "Rating", "Selling Price", "Points"],
+            title="Parallel Coordinates Plot for Feature Comparison"
+        )
+        st.plotly_chart(fig)
+
+        # **Visual 5: Radar Chart for Feature Comparison**
+        st.subheader("Radar Chart for Feature Comparison")
+        radar_data = comparison_data[['Model', 'Memory', 'Storage', 'Rating', 'Selling Price', 'Points']]
+        radar_data = radar_data.set_index('Model')
+        fig = px.line_polar(radar_data, r='Memory', theta=radar_data.index, line_close=True, title="Radar Chart of Phone Features")
+        st.plotly_chart(fig)
+
+        # **Visual 6: Correlation Heatmap (Numerical Data)**
+        st.subheader("Correlation Heatmap")
+        corr = comparison_data[['Memory', 'Storage', 'Rating', 'Selling Price', 'Original Price', 'Points']].corr()
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(corr, annot=True, cmap='coolwarm', fmt='.2f', linewidths=0.5)
+        st.pyplot(plt)
+
+        # **Visual 7: Distribution of Points (Histogram)**
+        st.subheader("Points Distribution")
+        fig = px.histogram(comparison_data, x='Points', title="Distribution of Points across Phones", color='Model')
+        st.plotly_chart(fig)
+
+        # **Visual 8: Line Plot of Selling Price vs Rating (Trend analysis)**
+        st.subheader("Selling Price vs Rating Trend (Line Plot)")
+        fig = px.line(comparison_data, x='Selling Price', y='Rating', color='Model', markers=True, title="Selling Price vs Rating Trend")
+        st.plotly_chart(fig)
+
+        # **Visual 9: Line Plot of Storage vs Points (Trend analysis)**
+        st.subheader("Storage vs Points Trend (Line Plot)")
+        fig = px.line(comparison_data, x='Storage', y='Points', color='Model', markers=True, title="Storage vs Points Trend")
+        st.plotly_chart(fig)
+
+        # **Visual 10: Line Plot of Memory vs Selling Price (Trend analysis)**
+        st.subheader("Memory (RAM) vs Selling Price Trend (Line Plot)")
+        fig = px.line(comparison_data, x='Memory', y='Selling Price', color='Model', markers=True, title="Memory (RAM) vs Selling Price Trend")
+        st.plotly_chart(fig)
+
+# Call the function to show phone comparison when running the app
+
+
+
+
+
+
+
+# Sidebar Navigation
+st.sidebar.title("Navigation")
+page = st.sidebar.selectbox("Go to", ["Home", "Compare Products", "Compare Phones"])
+
+if page == "Home":
+    load_css()
+    show_home()
+
+elif page == "Compare Products":
+    load_css()
+    show_compare()
+
+elif page == "Compare Phones":
+    load_css()
+    show_phone_comparison()
