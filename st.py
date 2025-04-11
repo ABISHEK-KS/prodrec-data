@@ -8,10 +8,12 @@ from mpl_toolkits.mplot3d import Axes3D
 import os
 import re
 import numpy as np
+import warnings
+warnings.filterwarnings("ignore", message=".*use_column_width.*")
 
 # Configurations
 st.set_page_config(page_title="ProdRec - Product Comparison Platform", page_icon="🛍️", layout="wide")
-st.set_option('deprecation.showPyplotGlobalUse', False)
+
 
 # Load and Apply External CSS (if exists)
 def load_css():
