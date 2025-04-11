@@ -11,6 +11,7 @@ import numpy as np
 
 # Configurations
 st.set_page_config(page_title="ProdRec - Product Comparison Platform", page_icon="🛍️", layout="wide")
+st.set_option('deprecation.showPyplotGlobalUse', False)
 
 # Load and Apply External CSS (if exists)
 def load_css():
