@@ -8,12 +8,9 @@ from mpl_toolkits.mplot3d import Axes3D
 import os
 import re
 import numpy as np
-import warnings
-warnings.filterwarnings("ignore", message=".*use_column_width.*")
 
 # Configurations
 st.set_page_config(page_title="ProdRec - Product Comparison Platform", page_icon="🛍️", layout="wide")
-
 
 # Load and Apply External CSS (if exists)
 def load_css():
@@ -54,10 +51,10 @@ def show_home():
     - Compare features, prices, and ratings side-by-side.
     - Decide with confidence, backed by clear, transparent insights.
 
-    Let's make your shopping experience smarter, easier, and more rewarding.""")
+    Let’s make your shopping experience smarter, easier, and more rewarding.""")
     st.image(
         "https://via.placeholder.com/1200x500.png?text=Your+Product+Comparison+Starts+Here!",
-        use_container_width=True,
+        use_column_width=True,
         caption="Explore. Compare. Decide."
     )
     st.markdown("---")
@@ -102,6 +99,8 @@ def parse_categories(data):
     data['parsed_category'] = data['Category'].apply(lambda x: x.split('|')[0] if isinstance(x, str) else 'Unknown')
     return data
 
+
+
 def show_home():
     """Render the Home Page."""
     st.title("Welcome to **ProdRec**")
@@ -111,7 +110,7 @@ def show_home():
     - Compare features, prices, and ratings side-by-side.
     - Decide with confidence, backed by clear, transparent insights.
 
-    Let's make your shopping experience smarter, easier, and more rewarding.""")
+    Let’s make your shopping experience smarter, easier, and more rewarding.""")
     st.image(
         "https://via.placeholder.com/1200x500.png?text=Your+Product+Comparison+Starts+Here!",
         use_column_width=True,
@@ -204,6 +203,13 @@ def parse_categories(data):
     data['parsed_category'] = data['Category'].apply(lambda x: x.split('|')[0] if isinstance(x, str) else 'Unknown')
     return data
 
+
+
+
+
+
+#<---------------MAIN-FEATURES----PROCEED/LOG MODIFICATIONS---->
+
 def clean_price(price_str):
     """Function to clean non-numeric characters from price strings and handle empty values."""
     if not price_str or price_str == '' or pd.isna(price_str):
@@ -217,6 +223,7 @@ def clean_price(price_str):
     except ValueError:
         return np.nan  # Return NaN if conversion fails
 
+# Function to load product data from the 'aadv' folder
 def load_data_from_folder(folder_path="aadv"):
     """Loads the product data from the 'aadv' folder and returns a DataFrame."""
     all_data = []
@@ -239,6 +246,7 @@ def load_data_from_folder(folder_path="aadv"):
         st.warning("No valid CSV files found in the folder.")
         return pd.DataFrame()
 
+# Function to display the comparison page
 def clean_ratings(rating_str):
     """Function to clean non-numeric characters from ratings and handle empty values."""
     try:
@@ -246,6 +254,7 @@ def clean_ratings(rating_str):
     except ValueError:
         return np.nan  # Return NaN for invalid ratings
 
+# In the show_compare function, clean ratings
 def show_compare():
     """Render the Product Comparison Page with Visualizations"""
     st.title("🔍 Product Comparison")
@@ -320,10 +329,6 @@ def show_compare():
         ax.set_title('Price vs Ratings for Selected Products')
         ax.legend()
         st.pyplot(fig)
-        st.markdown("""
-        **Explanation:** This dual bar chart shows both price (blue bars) and ratings (orange bars, scaled by 10 for visibility) 
-        for each product. Allows direct comparison of cost versus quality ratings across products.
-        """)
 
         # 2. Scatter Plot for Price vs Rating
         st.subheader("Scatter Plot of Price vs Rating")
@@ -333,10 +338,6 @@ def show_compare():
         ax.set_ylabel('Ratings')
         ax.set_title('Price vs Rating Scatter Plot')
         st.pyplot(fig)
-        st.markdown("""
-        **Explanation:** Each point represents one product. The ideal position is top-left (low price, high rating). 
-        Shows correlation between price and perceived quality - look for clusters in the upper-left quadrant for best value.
-        """)
 
         # 3. Radar Chart for Product Comparison
         st.subheader("Radar Chart: Price vs Ratings")
@@ -347,11 +348,6 @@ def show_compare():
         ax.fill(categories, values, alpha=0.25)
         ax.set_title('Radar Chart of Price and Rating Comparison')
         st.pyplot(fig)
-        st.markdown("""
-        **Explanation:** This radar chart shows average price and ratings on different axes. 
-        Larger area indicates better overall value (lower price + higher rating). 
-        Helps visualize trade-offs between price and quality.
-        """)
 
     else:
         st.warning("Please select at least 2 products for comparison.")
@@ -359,8 +355,19 @@ def show_compare():
     st.markdown("---")
     st.markdown("© 2024 ProdRec Inc. | Built with ❤️ using Streamlit")
 
+
+
+
+
+#<------------LOG MODIFICATIONS IN GITHUB--------->
+
+
+
+    
 # Load the phone data
 phone_data = pd.read_csv('prp.csv')
+
+
 
 def show_phone_comparison():
     """Render Phone Comparison Section with Advanced and Aesthetically Pleasing Visuals."""
@@ -430,31 +437,16 @@ def show_phone_comparison():
         st.subheader("Rating Distribution by Model (Violin Plot)")
         fig = px.violin(comparison_data, y='Rating', x='Model', color='Model', box=True, points="all", title="Rating Distribution by Model")
         st.plotly_chart(fig)
-        st.markdown("""
-        **Explanation:** Shows the distribution of user ratings for each phone model. 
-        The width represents rating frequency - wider sections show more common ratings.
-        The white dot shows the median rating, and the thick black bar shows the interquartile range.
-        """)
 
         # **Visual 2: Violin Plot of Selling Price Distribution by Model**
         st.subheader("Selling Price Distribution by Model (Violin Plot)")
         fig = px.violin(comparison_data, y='Selling Price', x='Model', color='Model', box=True, points="all", title="Selling Price Distribution by Model")
         st.plotly_chart(fig)
-        st.markdown("""
-        **Explanation:** Visualizes the price distribution for each model. 
-        Shows the full range of prices, with the white dot indicating the median price.
-        Helps identify which models have consistent pricing versus wide variations.
-        """)
 
         # **Visual 3: Violin Plot of Memory (RAM) Distribution by Model**
         st.subheader("Memory (RAM) Distribution by Model (Violin Plot)")
         fig = px.violin(comparison_data, y='Memory', x='Model', color='Model', box=True, points="all", title="Memory (RAM) Distribution by Model")
         st.plotly_chart(fig)
-        st.markdown("""
-        **Explanation:** Compares RAM configurations across models. 
-        The height shows the range of available memory options for each phone.
-        Useful for seeing which models offer more RAM variants.
-        """)
 
         # **Visual 4: Parallel Coordinates Plot (for feature comparison)**
         st.subheader("Parallel Coordinates Plot")
@@ -463,11 +455,6 @@ def show_phone_comparison():
             title="Parallel Coordinates Plot for Feature Comparison"
         )
         st.plotly_chart(fig)
-        st.markdown("""
-        **Explanation:** Each colored line represents a phone model across multiple dimensions.
-        Lets you compare multiple specs simultaneously - lines that stay higher across all dimensions 
-        represent better overall phones. Look for lines that dominate in most categories.
-        """)
 
         # **Visual 5: Radar Chart for Feature Comparison**
         st.subheader("Radar Chart for Feature Comparison")
@@ -475,11 +462,6 @@ def show_phone_comparison():
         radar_data = radar_data.set_index('Model')
         fig = px.line_polar(radar_data, r='Memory', theta=radar_data.index, line_close=True, title="Radar Chart of Phone Features")
         st.plotly_chart(fig)
-        st.markdown("""
-        **Explanation:** Spider/radar chart showing relative strengths of each model.
-        More symmetrical shapes with larger areas indicate better balanced performance.
-        Helps quickly identify which phones excel in multiple categories.
-        """)
 
         # **Visual 6: Correlation Heatmap (Numerical Data)**
         st.subheader("Correlation Heatmap")
@@ -487,52 +469,34 @@ def show_phone_comparison():
         plt.figure(figsize=(8, 6))
         sns.heatmap(corr, annot=True, cmap='coolwarm', fmt='.2f', linewidths=0.5)
         st.pyplot(plt)
-        st.markdown("""
-        **Explanation:** Shows how different phone features relate to each other.
-        Values close to 1 (dark red) indicate strong positive correlation.
-        Values close to -1 (dark blue) show negative correlation.
-        Helps understand relationships like price vs. performance.
-        """)
 
         # **Visual 7: Distribution of Points (Histogram)**
         st.subheader("Points Distribution")
         fig = px.histogram(comparison_data, x='Points', title="Distribution of Points across Phones", color='Model')
         st.plotly_chart(fig)
-        st.markdown("""
-        **Explanation:** Shows how the calculated points are distributed across selected phones.
-        Taller bars indicate more phones with that score level.
-        Helps identify if there's a clear winner or closely matched competitors.
-        """)
 
         # **Visual 8: Line Plot of Selling Price vs Rating (Trend analysis)**
         st.subheader("Selling Price vs Rating Trend (Line Plot)")
         fig = px.line(comparison_data, x='Selling Price', y='Rating', color='Model', markers=True, title="Selling Price vs Rating Trend")
         st.plotly_chart(fig)
-        st.markdown("""
-        **Explanation:** Shows the relationship between price and rating for each model.
-        The ideal position is top-left (low price, high rating).
-        Lines moving upward to the right indicate you pay more for better ratings.
-        """)
 
         # **Visual 9: Line Plot of Storage vs Points (Trend analysis)**
         st.subheader("Storage vs Points Trend (Line Plot)")
         fig = px.line(comparison_data, x='Storage', y='Points', color='Model', markers=True, title="Storage vs Points Trend")
         st.plotly_chart(fig)
-        st.markdown("""
-        **Explanation:** Illustrates how storage capacity affects the overall score.
-        Generally, higher storage should correlate with higher points.
-        Steeper lines indicate models where more storage significantly boosts value.
-        """)
 
         # **Visual 10: Line Plot of Memory vs Selling Price (Trend analysis)**
         st.subheader("Memory (RAM) vs Selling Price Trend (Line Plot)")
         fig = px.line(comparison_data, x='Memory', y='Selling Price', color='Model', markers=True, title="Memory (RAM) vs Selling Price Trend")
         st.plotly_chart(fig)
-        st.markdown("""
-        **Explanation:** Shows how RAM size affects pricing for each model.
-        Steeper slopes indicate models where RAM upgrades cost more.
-        Helps identify which brands charge premium for memory upgrades.
-        """)
+
+# Call the function to show phone comparison when running the app
+
+
+
+
+
+
 
 # Sidebar Navigation
 st.sidebar.title("Navigation")
