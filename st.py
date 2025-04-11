@@ -57,7 +57,7 @@ def show_home():
     Let's make your shopping experience smarter, easier, and more rewarding.""")
     st.image(
         "https://via.placeholder.com/1200x500.png?text=Your+Product+Comparison+Starts+Here!",
-        use_column_width=True,
+        use_container_width=True,
         caption="Explore. Compare. Decide."
     )
     st.markdown("---")
